@@ -73,7 +73,13 @@ print_summary() {
 
 # ─── 主题与组件选择 ──────────────────────────────────────────────────────────────────
 # 可选值: p10k, pure
-SELECTED_THEME="p10k"
+if [[ -f "$HOME/.zshrc" ]] && grep -q "prompt pure" "$HOME/.zshrc" 2>/dev/null; then
+    SELECTED_THEME="pure"
+elif [[ -d "$HOME/.zsh/pure" ]] && { [[ ! -d "$HOME/powerlevel10k" ]] && ! grep -q "powerlevel10k.zsh-theme" "$HOME/.zshrc" 2>/dev/null; }; then
+    SELECTED_THEME="pure"
+else
+    SELECTED_THEME="p10k"
+fi
 # 可选为空（全选），或逗号分隔的组件标识符 (如 "rustup,volta,uv")
 SELECTED_COMPONENTS=""
 # 是否自动清理原脚本文件
@@ -793,18 +799,23 @@ select_theme() {
     echo ""
     echo -e "${BOLD}${CYAN}请选择终端主题：${NC}"
     echo ""
-    echo -e "  ${CYAN}1${NC}) ${BOLD}Powerlevel10k${NC} ★默认"
+    echo -e "  ${CYAN}1${NC}) ${BOLD}Powerlevel10k${NC}$( [[ "$SELECTED_THEME" == "p10k" ]] && echo -e " ${YELLOW}★当前默认${NC}" )"
     echo -e "     ${GREEN}优势：${NC}高度可定制、丰富图标、Git 状态即时显示、Instant Prompt 极速启动"
     echo -e "     ${YELLOW}注意：${NC}需要在宿主机安装 Nerd Font 字体"
     echo ""
-    echo -e "  ${CYAN}2${NC}) ${BOLD}Pure${NC}"
+    echo -e "  ${CYAN}2${NC}) ${BOLD}Pure${NC}$( [[ "$SELECTED_THEME" == "pure" ]] && echo -e " ${YELLOW}★当前默认${NC}" )"
     echo -e "     ${GREEN}优势：${NC}极简美观、零配置、不依赖特殊字体、异步 Git 检测不阻塞输入"
     echo -e "     ${YELLOW}注意：${NC}宿主机${BOLD}无需${NC}${YELLOW}安装任何特殊字体${NC}"
     echo ""
-    read -rp "请选择 (1/2) [默认: 1]: " theme_choice
-    case "${theme_choice:-1}" in
+    
+    local default_choice="1"
+    [[ "$SELECTED_THEME" == "pure" ]] && default_choice="2"
+    
+    read -rp "请选择 (1/2) [默认保持: ${SELECTED_THEME}]: " theme_choice
+    case "${theme_choice:-$default_choice}" in
         2) SELECTED_THEME="pure" ;;
-        *) SELECTED_THEME="p10k" ;;
+        1) SELECTED_THEME="p10k" ;;
+        *) SELECTED_THEME="$SELECTED_THEME" ;;
     esac
     success "已选择主题: $SELECTED_THEME"
 }
