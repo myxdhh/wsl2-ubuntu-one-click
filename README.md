@@ -17,7 +17,7 @@ docker desktop 基本上都安装过了，就不写到脚本了。
 - 子系统 Ubuntu-24.04
 - 终端 zsh + oh my zsh + powerlevel10k / pure + zsh-autosuggestions + zsh-syntax-highlighting
 - 字体 MesloLGS NF
-- 工具 Rust, Volta, uv, proto, eza, yazi
+- 工具 Rust, Volta（包含 node、npm、pnpm 的 latest 版本）, uv（python 的 3.14 版本）, proto, eza, yazi
 
 ## 文件说明
 
