@@ -169,7 +169,7 @@ source_uv_env() {
 
 source_proto_env() {
     export PROTO_HOME="$HOME/.proto"
-    [[ -d "$PROTO_HOME/shims" ]] && export PATH="$PROTO_HOME/shims:$PROTO_HOME/bin:$PATH"
+    export PATH="$PROTO_HOME/shims:$PROTO_HOME/bin:$PATH"
 }
 
 # ─── 安装函数 ─────────────────────────────────────────────────────────────────
@@ -609,7 +609,7 @@ export VOLTA_FEATURE_PNPM=1
 
 # ── proto ──
 export PROTO_HOME="$HOME/.proto"
-[[ -d "$PROTO_HOME/shims" ]] && export PATH="$PROTO_HOME/shims:$PROTO_HOME/bin:$PATH"
+export PATH="$PROTO_HOME/shims:$PROTO_HOME/bin:$PATH"
 
 # <<< one-click-dev-env <<<
 ENV_BLOCK
