@@ -85,11 +85,52 @@ function Step-Prerequisites {
     Write-Header "步骤 0: WSL2 前置条件检查"
 
     # 检查 Windows 版本
+    # WSL2 完整支持需要 Windows 10 版本 2004 (Build 19041) 或更高
+    # Build 18362 (1903) 仅支持 WSL1，不支持 WSL2
     $osVersion = [System.Environment]::OSVersion.Version
     Write-Info "当前系统: Windows $($osVersion.Major).$($osVersion.Minor) (Build $($osVersion.Build))"
-    if ($osVersion.Build -lt 18362) {
-        Write-Err "WSL2 需要 Windows 10 版本 1903 (Build 18362) 或更高版本"
+    if ($osVersion.Build -lt 19041) {
+        Write-Err "WSL2 需要 Windows 10 版本 2004 (Build 19041) 或更高版本"
+        Write-Err "当前系统 Build $($osVersion.Build) 不满足要求，请先更新 Windows"
         exit 1
+    }
+
+    # 检查硬件虚拟化 (Intel VT-x / AMD-V)
+    # WSL2 依赖 Hyper-V 虚拟化，必须在 BIOS/UEFI 中开启
+    try {
+        $vmFirmware = Get-CimInstance -ClassName Win32_Processor -Property VirtualizationFirmwareEnabled -ErrorAction Stop
+        if ($vmFirmware.VirtualizationFirmwareEnabled -eq $true) {
+            Write-Ok "硬件虚拟化 (VT-x/AMD-V) 已在 BIOS 中启用"
+        }
+        elseif ($vmFirmware.VirtualizationFirmwareEnabled -eq $false) {
+            Write-Err "硬件虚拟化 (VT-x/AMD-V) 未启用！"
+            Write-Err "请进入 BIOS/UEFI 设置（开机时按 F2/F10/Del），启用以下选项："
+            Write-Host "  Intel 平台: Intel Virtualization Technology (VT-x)" -ForegroundColor Yellow
+            Write-Host "  AMD 平台: SVM Mode (AMD-V)" -ForegroundColor Yellow
+            Write-Host "  启用后保存并重启，再运行此脚本" -ForegroundColor Yellow
+            exit 1
+        }
+        else {
+            Write-Warn "无法确认硬件虚拟化状态，继续安装..."
+        }
+    }
+    catch {
+        Write-Warn "无法检测硬件虚拟化状态 (可能权限不足)，继续安装..."
+    }
+
+    # 检查 Hyper-V Hypervisor 启动类型
+    try {
+        $hvStatus = (bcdedit /enum | Select-String -Pattern "hypervisorlaunchtype\s+(\w+)" | ForEach-Object { $_.Matches.Groups[1].Value })
+        if ($hvStatus -eq "Off" -or $hvStatus -eq "off") {
+            Write-Warn "Hypervisor 启动类型为 Off，WSL2 可能无法正常运行"
+            if (Confirm-Action "是否自动修复 (bcdedit /set hypervisorlaunchtype Auto)？" -DefaultYes) {
+                bcdedit /set hypervisorlaunchtype Auto | Out-Null
+                Write-Ok "已将 Hypervisor 启动类型设为 Auto（需重启生效）"
+            }
+        }
+    }
+    catch {
+        # bcdedit 可能在某些环境不可用，忽略
     }
 
     $needRestart = $false
@@ -144,6 +185,21 @@ function Step-Prerequisites {
     # 设置 WSL2 为默认版本
     wsl --set-default-version 2 2>$null
     Write-Ok "已将 WSL 2 设为默认版本"
+
+    # 更新 WSL 组件和内核到最新版本
+    Write-Info "检查 WSL 组件更新..."
+    $updateOutput = wsl --update 2>&1
+    if ($LASTEXITCODE -eq 0) {
+        Write-Ok "WSL 组件已是最新版本"
+    }
+    else {
+        Write-Warn "WSL 更新失败 (可能网络问题)，继续安装..."
+        Write-Info "如遇问题可稍后手动运行: wsl --update"
+    }
+
+    # 显示当前 WSL 状态
+    Write-Info "当前 WSL 状态:"
+    wsl --status 2>$null | ForEach-Object { Write-Host "  $_" -ForegroundColor DarkGray }
 }
 
 # =============================================================================
@@ -281,9 +337,12 @@ function Step-InstallFont {
         try {
             Write-Info "配置 $($settingsFile.Name) 字体..."
 
-            # 读取 JSON（去除注释行，Windows Terminal 的 JSON 允许注释）
+            # 读取 JSON（去除注释，Windows Terminal 的 JSON 允许 JSONC 格式注释）
             $rawContent = Get-Content $settingsFile.Path -Raw
+            # 移除独占一整行的 // 注释（不触及字符串值中的 URL 等）
             $cleanContent = $rawContent -replace '(?m)^\s*//.*$', ''
+            # 移除行尾 // 注释（跟在 , 或 { 后面的注释）
+            $cleanContent = $cleanContent -replace '(?m)(["{},\]\[]\s*)//(?![/"]).+$', '$1'
             $settings = $cleanContent | ConvertFrom-Json
 
             $modified = $false
@@ -399,11 +458,11 @@ function Step-InstallDistro {
 
     # 安装（使用 --no-launch 避免自动进入子系统）
     Write-Info "正在安装 $selectedDistro（--web-download --no-launch 模式，这可能需要几分钟）..."
-    $installCmd = "wsl --install $selectedDistro --location `"$installLocation`" --name $instanceName --version 2 --web-download --no-launch"
-    Write-Info "命令: $installCmd"
+    $wslArgs = @("--install", "-d", $selectedDistro, "--location", $installLocation, "--name", $instanceName, "--version", "2", "--web-download", "--no-launch")
+    Write-Info "命令: wsl $($wslArgs -join ' ')"
 
     try {
-        Invoke-Expression $installCmd | Out-Host
+        & wsl @wslArgs | Out-Host
     }
     catch {
         Write-Err "安装失败: $_"
@@ -521,20 +580,61 @@ function Step-ConfigureWslconfig {
     $autoProxy = if ($apChoice -eq "2") { "false" } else { "true" }
     Write-Ok "autoProxy=$autoProxy"
 
-    # 构建 .wslconfig 内容
-    $wslconfigContent = @"
-# WSL2 全局配置 - 由 setup-wsl.ps1 生成
-# 更多设置请参考: https://learn.microsoft.com/zh-cn/windows/wsl/wsl-config
+    # 构建新的配置键值
+    $newWsl2Settings = @{
+        "networkingMode" = $networkingMode
+        "dnsTunneling"   = $dnsTunneling
+        "firewall"       = $firewall
+        "autoProxy"      = $autoProxy
+    }
+    $newExperimentalSettings = @{
+        "autoMemoryReclaim" = $autoMemoryReclaim
+    }
 
-[wsl2]
-networkingMode=$networkingMode
-dnsTunneling=$dnsTunneling
-firewall=$firewall
-autoProxy=$autoProxy
+    # 解析已有 .wslconfig 内容，合并而非覆盖
+    $existingSections = @{}
+    $currentSection = ""
+    if (Test-Path $wslconfigPath) {
+        foreach ($line in (Get-Content $wslconfigPath)) {
+            $trimmed = $line.Trim()
+            if ($trimmed -match '^\[(.+)\]$') {
+                $currentSection = $Matches[1]
+                if (-not $existingSections.ContainsKey($currentSection)) {
+                    $existingSections[$currentSection] = [ordered]@{}
+                }
+            }
+            elseif ($trimmed -match '^([^#;][^=]*)=(.*)$' -and $currentSection) {
+                $existingSections[$currentSection][$Matches[1].Trim()] = $Matches[2].Trim()
+            }
+        }
+    }
 
-[experimental]
-autoMemoryReclaim=$autoMemoryReclaim
-"@
+    # 合并 [wsl2] 节
+    if (-not $existingSections.ContainsKey("wsl2")) {
+        $existingSections["wsl2"] = [ordered]@{}
+    }
+    foreach ($key in $newWsl2Settings.Keys) {
+        $existingSections["wsl2"][$key] = $newWsl2Settings[$key]
+    }
+
+    # 合并 [experimental] 节
+    if (-not $existingSections.ContainsKey("experimental")) {
+        $existingSections["experimental"] = [ordered]@{}
+    }
+    foreach ($key in $newExperimentalSettings.Keys) {
+        $existingSections["experimental"][$key] = $newExperimentalSettings[$key]
+    }
+
+    # 重新生成 .wslconfig 内容
+    $lines = @("# WSL2 全局配置 - 由 setup-wsl.ps1 生成", "# 更多设置请参考: https://learn.microsoft.com/zh-cn/windows/wsl/wsl-config", "")
+    foreach ($section in $existingSections.Keys) {
+        $lines += "[$section]"
+        foreach ($key in $existingSections[$section].Keys) {
+            $lines += "$key=$($existingSections[$section][$key])"
+        }
+        $lines += ""
+    }
+    $wslconfigContent = ($lines -join "`n").TrimEnd("`n")
 
     # 写入文件（使用 UTF8NoBOM，避免 BOM 影响 WSL 读取）
     [System.IO.File]::WriteAllText($wslconfigPath, $wslconfigContent, [System.Text.UTF8Encoding]::new($false))
@@ -572,12 +672,20 @@ function Step-CreateUser {
         $password = Read-Host "请输入密码" -AsSecureString
         $passwordConfirm = Read-Host "请确认密码" -AsSecureString
 
-        $pwdPlain = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
-            [Runtime.InteropServices.Marshal]::SecureStringToBSTR($password)
-        )
-        $pwdConfirmPlain = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
-            [Runtime.InteropServices.Marshal]::SecureStringToBSTR($passwordConfirm)
-        )
+        # 安全地解密 SecureString，确保 BSTR 指针被释放
+        $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($password)
+        try {
+            $pwdPlain = [Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr)
+        } finally {
+            [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
+        }
+
+        $bstrConfirm = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($passwordConfirm)
+        try {
+            $pwdConfirmPlain = [Runtime.InteropServices.Marshal]::PtrToStringAuto($bstrConfirm)
+        } finally {
+            [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstrConfirm)
+        }
 
         if ([string]::IsNullOrWhiteSpace($pwdPlain)) {
             Write-Err "密码不能为空"
@@ -594,25 +702,41 @@ function Step-CreateUser {
     Write-Info "在子系统 $InstanceName 中创建用户 $username..."
 
     try {
-        wsl -d $InstanceName -u root -- bash -c "id '$username' >/dev/null 2>&1 || useradd -m -s /bin/bash '$username'" | Out-Host
-        # Out-Host 会重置 LASTEXITCODE，需要通过 wsl 再次验证
-        wsl -d $InstanceName -u root -- bash -c "id '$username'" | Out-Host
-        if ($LASTEXITCODE -ne 0) { throw "useradd 失败" }
+        wsl -d $InstanceName -u root -- bash -c "id '$username' >/dev/null 2>&1 || useradd -m -s /bin/bash '$username'"
+        if ($LASTEXITCODE -ne 0) {
+            # 再次验证用户是否存在
+            wsl -d $InstanceName -u root -- bash -c "id '$username'"
+            if ($LASTEXITCODE -ne 0) { throw "useradd 失败" }
+        }
 
-        wsl -d $InstanceName -u root -- bash -c "echo '${username}:${pwdPlain}' | chpasswd" | Out-Host
+        # 通过管道传入密码，避免密码中的特殊字符被 shell 解释
+        "${username}:${pwdPlain}" | wsl -d $InstanceName -u root -- chpasswd
+        if ($LASTEXITCODE -ne 0) { throw "chpasswd 失败" }
 
         # 添加到 sudo 组
-        wsl -d $InstanceName -u root -- bash -c "usermod -aG sudo '$username'" | Out-Host
+        wsl -d $InstanceName -u root -- bash -c "usermod -aG sudo '$username'"
+        if ($LASTEXITCODE -ne 0) { throw "usermod 失败" }
 
         # 验证用户创建成功
-        wsl -d $InstanceName -u root -- bash -c "id '$username' && groups '$username'" | Out-Host
+        wsl -d $InstanceName -u root -- bash -c "id '$username' && groups '$username'"
         if ($LASTEXITCODE -ne 0) { throw "用户验证失败" }
 
         Write-Ok "用户 $username 创建完成"
 
-        # 设置默认用户（通过 /etc/wsl.conf）
-        $wslConfContent = "[user]`ndefault=$username"
-        wsl -d $InstanceName -u root -- bash -c "echo '$wslConfContent' > /etc/wsl.conf" | Out-Host
+        # 设置默认用户（通过 /etc/wsl.conf），合并而非覆盖已有配置
+        $wslConfScript = @"
+if grep -q '^\[user\]' /etc/wsl.conf 2>/dev/null; then
+    if grep -q '^default=' /etc/wsl.conf; then
+        sed -i '/^\[user\]/,/^\[/{s/^default=.*/default=$username/}' /etc/wsl.conf
+    else
+        sed -i '/^\[user\]/a default=$username' /etc/wsl.conf
+    fi
+else
+    printf '\n[user]\ndefault=$username\n' >> /etc/wsl.conf
+fi
+"@
+        wsl -d $InstanceName -u root -- bash -c $wslConfScript
+        if ($LASTEXITCODE -ne 0) { throw "wsl.conf 配置失败" }
 
         Write-Ok "已将 $username 设为子系统默认用户"
     }
@@ -822,7 +946,8 @@ function Main {
         Write-Host "  MesloLGS Nerd Font 字体安装" -ForegroundColor Cyan
         Write-Host "═══════════════════════════════════════════════" -ForegroundColor Cyan
         Write-Host ""
-        Step-InstallFont
+        $theme = Step-SelectTheme
+        Step-InstallFont -Theme $theme
 
         $elapsed = (Get-Date) - $startTime
         $elapsedStr = "{0:D2}:{1:D2}:{2:D2}" -f $elapsed.Hours, $elapsed.Minutes, $elapsed.Seconds
