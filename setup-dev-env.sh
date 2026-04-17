@@ -72,13 +72,17 @@ print_summary() {
 }
 
 # ─── 主题与插件管理器选择 ──────────────────────────────────────────────────────
-# 可选值: p10k, pure
-if [[ -f "$HOME/.zshrc" ]] && grep -q "prompt pure" "$HOME/.zshrc" 2>/dev/null; then
+# 可选值: starship, p10k, pure
+if command -v starship &>/dev/null || [[ -f "$HOME/.config/starship.toml" ]]; then
+    SELECTED_THEME="starship"
+elif [[ -f "$HOME/.zshrc" ]] && grep -q "prompt pure" "$HOME/.zshrc" 2>/dev/null; then
     SELECTED_THEME="pure"
 elif [[ -d "$HOME/.zsh/pure" ]] && { [[ ! -d "$HOME/powerlevel10k" ]] && ! grep -q "powerlevel10k.zsh-theme" "$HOME/.zshrc" 2>/dev/null; }; then
     SELECTED_THEME="pure"
-else
+elif [[ -d "$HOME/powerlevel10k" ]] || { [[ -f "$HOME/.zshrc" ]] && grep -q "powerlevel10k" "$HOME/.zshrc" 2>/dev/null; }; then
     SELECTED_THEME="p10k"
+else
+    SELECTED_THEME="starship"
 fi
 # 插件管理器: sheldon (默认), ohmyzsh
 if [[ -d "$HOME/.oh-my-zsh" ]] && ! command -v sheldon &>/dev/null; then
@@ -96,7 +100,7 @@ COMPONENTS=(
     "apt-deps:基础依赖包"
     "zsh:Zsh Shell"
     "plugin-mgr:插件管理器 (Sheldon/Oh My Zsh)"
-    "theme:终端主题 (p10k/pure)"
+    "theme:终端主题 (starship/p10k/pure)"
     "zsh-autosuggestions:zsh-autosuggestions 插件"
     "zsh-syntax-highlighting:zsh-syntax-highlighting 插件"
     "rustup:Rust 工具链 (rustup)"
@@ -429,13 +433,53 @@ install_pure() {
     log_end "pure" $?
 }
 
+install_starship_theme() {
+    header "安装 Starship 主题"
+    log_start "starship-theme"
+
+    # 安装 Starship 二进制
+    if command_exists starship; then
+        success "Starship 已安装: $(starship --version 2>&1 | head -1)"
+    else
+        info "正在安装 Starship..."
+        if ! curl -sS https://starship.rs/install.sh | sh -s -- --yes --bin-dir "$HOME/.local/bin" 2>&1 | tee -a "$LOG_FILE"; then
+            record_failure "starship-theme"
+            return 1
+        fi
+        export PATH="$HOME/.local/bin:$PATH"
+        success "Starship 安装完成"
+    fi
+
+    # 配置 catppuccin-powerline 预设
+    local starship_config="$HOME/.config/starship.toml"
+    if [[ -f "$starship_config" ]]; then
+        info "Starship 配置已存在，保留现有配置: $starship_config"
+    else
+        info "正在生成 catppuccin-powerline 预设..."
+        mkdir -p "$HOME/.config"
+        if starship preset catppuccin-powerline -o "$starship_config" 2>&1 | tee -a "$LOG_FILE"; then
+            # 确保 line_break 不被禁用
+            if grep -q '^\[line_break\]' "$starship_config"; then
+                sed -i '/^\[line_break\]/,/^\[/{s/disabled = true/disabled = false/}' "$starship_config"
+            else
+                printf '\n[line_break]\ndisabled = false\n' >> "$starship_config"
+            fi
+            success "catppuccin-powerline 预设已配置"
+        else
+            warn "预设生成失败，Starship 将使用默认配置"
+        fi
+    fi
+
+    log_end "starship-theme" $?
+}
+
 # 根据 SELECTED_THEME 安装对应主题
 install_theme() {
-    if [[ "$SELECTED_THEME" == "pure" ]]; then
-        install_pure
-    else
-        install_p10k
-    fi
+    case "$SELECTED_THEME" in
+        starship) install_starship_theme ;;
+        pure)     install_pure ;;
+        *)        install_p10k ;;
+    esac
 }
 
 install_zsh_autosuggestions() {
@@ -606,21 +650,27 @@ defer = """{{ hooks?.pre | nl }}{% for file in files %}zsh-defer source "{{ file
 
 TOML_HEADER
 
-    # 主题
-    if [[ "$SELECTED_THEME" == "pure" ]]; then
-        cat >> "$plugins_toml" << 'THEME_PURE'
+    # 主题（starship 不通过 sheldon 管理）
+    case "$SELECTED_THEME" in
+        pure)
+            cat >> "$plugins_toml" << 'THEME_PURE'
 [plugins.pure]
 github = "sindresorhus/pure"
 use = ["async.zsh", "pure.zsh"]
 
 THEME_PURE
-    else
-        cat >> "$plugins_toml" << 'THEME_P10K'
+            ;;
+        p10k)
+            cat >> "$plugins_toml" << 'THEME_P10K'
 [plugins.powerlevel10k]
 github = "romkatv/powerlevel10k"
 
 THEME_P10K
-    fi
+            ;;
+        starship)
+            # Starship 是独立二进制，不通过 Sheldon 管理
+            ;;
+    esac
 
     # 插件
     cat >> "$plugins_toml" << 'PLUGINS_BLOCK'
@@ -718,7 +768,7 @@ configure_zshrc() {
             echo "# >>> one-click-dev-env >>>"
             echo ""
 
-            if [[ "$SELECTED_THEME" != "pure" ]]; then
+            if [[ "$SELECTED_THEME" == "p10k" ]]; then
                 cat << 'P10K_INSTANT'
 # ── Powerlevel10k Instant Prompt ──
 if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
@@ -733,12 +783,18 @@ P10K_INSTANT
 eval "$(sheldon source)"
 SHELDON_BLOCK
 
-            if [[ "$SELECTED_THEME" != "pure" ]]; then
+            if [[ "$SELECTED_THEME" == "p10k" ]]; then
                 echo ""
                 cat << 'P10K_CONFIG'
 # ── Powerlevel10k config ──
 [[ -f ~/.p10k.zsh ]] && source ~/.p10k.zsh
 P10K_CONFIG
+            elif [[ "$SELECTED_THEME" == "starship" ]]; then
+                echo ""
+                cat << 'STARSHIP_INIT'
+# ── Starship Prompt ──
+eval "$(starship init zsh)"
+STARSHIP_INIT
             fi
 
             cat << 'ENV_BLOCK'
@@ -795,8 +851,9 @@ ENV_BLOCK
             echo "# >>> one-click-dev-env >>>"
             echo ""
 
-            if [[ "$SELECTED_THEME" == "pure" ]]; then
-                cat << 'PURE_BLOCK'
+            case "$SELECTED_THEME" in
+                pure)
+                    cat << 'PURE_BLOCK'
 # ── Pure Theme ──
 # pure 必须在 source oh-my-zsh.sh 之后加载
 fpath+=("$HOME/.zsh/pure")
@@ -804,8 +861,15 @@ autoload -U promptinit; promptinit
 zstyle :prompt:pure:git:stash show yes
 prompt pure
 PURE_BLOCK
-            else
-                cat << 'P10K_BLOCK'
+                    ;;
+                starship)
+                    cat << 'STARSHIP_BLOCK'
+# ── Starship Prompt ──
+eval "$(starship init zsh)"
+STARSHIP_BLOCK
+                    ;;
+                *)
+                    cat << 'P10K_BLOCK'
 # ── Powerlevel10k Instant Prompt ──
 if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
   source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
@@ -815,7 +879,8 @@ fi
 [[ -f ~/powerlevel10k/powerlevel10k.zsh-theme ]] && source ~/powerlevel10k/powerlevel10k.zsh-theme
 [[ -f ~/.p10k.zsh ]] && source ~/.p10k.zsh
 P10K_BLOCK
-            fi
+                    ;;
+            esac
 
             cat << 'ENV_BLOCK'
 
@@ -898,6 +963,7 @@ uninstall_pure() {
 }
 
 uninstall_theme() {
+    uninstall_starship_theme
     uninstall_p10k
     uninstall_pure
 }
@@ -1021,6 +1087,17 @@ remove_zshrc_config() {
     fi
 }
 
+uninstall_starship_theme() {
+    header "卸载 Starship"
+    if command_exists starship || [[ -f "$HOME/.local/bin/starship" ]]; then
+        rm -f "$HOME/.local/bin/starship"
+        rm -f "$HOME/.config/starship.toml"
+        success "Starship 已卸载"
+    else
+        info "Starship 未安装，跳过"
+    fi
+}
+
 # ─── 耗时估算 ─────────────────────────────────────────────────────────────────
 
 estimate_time() {
@@ -1069,22 +1146,28 @@ select_theme() {
     echo ""
     echo -e "${BOLD}${CYAN}请选择终端主题：${NC}"
     echo ""
-    echo -e "  ${CYAN}1${NC}) ${BOLD}Powerlevel10k${NC}$( [[ "$SELECTED_THEME" == "p10k" ]] && echo -e " ${YELLOW}★当前默认${NC}" )"
+    echo -e "  ${CYAN}1${NC}) ${BOLD}Starship (catppuccin-powerline)${NC}$( [[ "$SELECTED_THEME" == "starship" ]] && echo -e " ${YELLOW}★当前默认${NC}" )"
+    echo -e "     ${GREEN}优势：${NC}Rust 编写极速渲染、跨 Shell 统一、高度可定制、内置 git/语言检测"
+    echo -e "     ${YELLOW}注意：${NC}推荐安装 Nerd Font 以获得最佳图标体验"
+    echo ""
+    echo -e "  ${CYAN}2${NC}) ${BOLD}Powerlevel10k${NC}$( [[ "$SELECTED_THEME" == "p10k" ]] && echo -e " ${YELLOW}★当前默认${NC}" )"
     echo -e "     ${GREEN}优势：${NC}高度可定制、丰富图标、Git 状态即时显示、Instant Prompt 极速启动"
     echo -e "     ${YELLOW}注意：${NC}需要在宿主机安装 Nerd Font 字体"
     echo ""
-    echo -e "  ${CYAN}2${NC}) ${BOLD}Pure${NC}$( [[ "$SELECTED_THEME" == "pure" ]] && echo -e " ${YELLOW}★当前默认${NC}" )"
+    echo -e "  ${CYAN}3${NC}) ${BOLD}Pure${NC}$( [[ "$SELECTED_THEME" == "pure" ]] && echo -e " ${YELLOW}★当前默认${NC}" )"
     echo -e "     ${GREEN}优势：${NC}极简美观、零配置、不依赖特殊字体、异步 Git 检测不阻塞输入"
     echo -e "     ${YELLOW}注意：${NC}宿主机${BOLD}无需${NC}${YELLOW}安装任何特殊字体${NC}"
     echo ""
-    
+
     local default_choice="1"
-    [[ "$SELECTED_THEME" == "pure" ]] && default_choice="2"
-    
-    read -rp "请选择 (1/2) [默认保持: ${SELECTED_THEME}]: " theme_choice
+    [[ "$SELECTED_THEME" == "p10k" ]] && default_choice="2"
+    [[ "$SELECTED_THEME" == "pure" ]] && default_choice="3"
+
+    read -rp "请选择 (1/2/3) [默认保持: ${SELECTED_THEME}]: " theme_choice
     case "${theme_choice:-$default_choice}" in
-        2) SELECTED_THEME="pure" ;;
-        1) SELECTED_THEME="p10k" ;;
+        1) SELECTED_THEME="starship" ;;
+        2) SELECTED_THEME="p10k" ;;
+        3) SELECTED_THEME="pure" ;;
         *) SELECTED_THEME="$SELECTED_THEME" ;;
     esac
     success "已选择主题: $SELECTED_THEME"
@@ -1103,7 +1186,7 @@ run_install_all() {
     fi
 
     # 如果未通过 --theme 指定主题，则交互选择
-    if [[ "$SELECTED_THEME" == "p10k" ]] && [[ "${THEME_SET_BY_FLAG:-}" != "1" ]]; then
+    if [[ "${THEME_SET_BY_FLAG:-}" != "1" ]]; then
         select_theme
     fi
 
@@ -1161,11 +1244,11 @@ run_install_all() {
     else
         echo "  • Zsh + Oh My Zsh"
     fi
-    if [[ "$SELECTED_THEME" == "pure" ]]; then
-        echo "  • Pure 主题"
-    else
-        echo "  • Powerlevel10k 主题"
-    fi
+    case "$SELECTED_THEME" in
+        starship) echo "  • Starship 主题 (catppuccin-powerline)" ;;
+        pure)     echo "  • Pure 主题" ;;
+        *)        echo "  • Powerlevel10k 主题" ;;
+    esac
 
     echo "  • zsh-autosuggestions"
     echo "  • zsh-syntax-highlighting"
@@ -1181,20 +1264,29 @@ run_install_all() {
     print_summary
 
     echo ""
-    if [[ "$SELECTED_THEME" == "pure" ]]; then
-        info "Pure 主题已配置，无需额外步骤"
-    else
-        warn "请手动运行 ${BOLD}p10k configure${NC}${YELLOW} 配置 Powerlevel10k 主题偏好${NC}"
-    fi
+    case "$SELECTED_THEME" in
+        starship)
+            info "Starship (catppuccin-powerline) 主题已配置"
+            info "配置文件: ${BOLD}~/.config/starship.toml${NC}"
+            ;;
+        pure)
+            info "Pure 主题已配置，无需额外步骤"
+            ;;
+        *)
+            warn "请手动运行 ${BOLD}p10k configure${NC}${YELLOW} 配置 Powerlevel10k 主题偏好${NC}"
+            ;;
+    esac
 
     echo ""
-    info "如果终端中的 ${BOLD}图标显示为乱码或问号${NC}，说明缺少 Nerd Font 字体。"
-    echo -e "  请在日常使用的终端软件（如 Windows Terminal, iTerm2, Alacritty 等）中配置字体为 ${BOLD}MesloLGS NF${NC}。"
-    echo -e "  ${YELLOW}字体安装命令提示：${NC}"
-    echo -e "    • ${BOLD}Windows (WSL)${NC}: 在宿主机 PowerShell 中运行 ${CYAN}iex (iwr -useb https://raw.githubusercontent.com/romkatv/powerlevel10k-media/master/fonts.ps1)${NC}"
-    echo -e "    • ${BOLD}macOS${NC}: ${CYAN}brew tap homebrew/cask-fonts && brew install --cask font-meslo-lg-nerd-font${NC}"
-    echo -e "    • ${BOLD}Linux${NC}: 下载并移动字体文件至 ${CYAN}~/.local/share/fonts${NC}，然后运行 ${CYAN}fc-cache -f -v${NC}"
-    echo ""
+    if [[ "$SELECTED_THEME" != "pure" ]]; then
+        info "如果终端中的 ${BOLD}图标显示为乱码或问号${NC}，说明缺少 Nerd Font 字体。"
+        echo -e "  请在日常使用的终端软件（如 Windows Terminal, iTerm2, Alacritty 等）中配置字体为 ${BOLD}MesloLGS NF${NC}。"
+        echo -e "  ${YELLOW}字体安装命令提示：${NC}"
+        echo -e "    • ${BOLD}Windows (WSL)${NC}: 在宿主机 PowerShell 中运行 ${CYAN}iex (iwr -useb https://raw.githubusercontent.com/romkatv/powerlevel10k-media/master/fonts.ps1)${NC}"
+        echo -e "    • ${BOLD}macOS${NC}: ${CYAN}brew tap homebrew/cask-fonts && brew install --cask font-meslo-lg-nerd-font${NC}"
+        echo -e "    • ${BOLD}Linux${NC}: 下载并移动字体文件至 ${CYAN}~/.local/share/fonts${NC}，然后运行 ${CYAN}fc-cache -f -v${NC}"
+        echo ""
+    fi
 
     info "运行 ${BOLD}exec zsh${NC} 或重新登录以启用新配置"
 
@@ -1254,7 +1346,9 @@ show_status_indicator() {
         eza)          command_exists eza && echo -e "${GREEN}●${NC}" || echo -e "${RED}○${NC}" ;;
         yazi)         command_exists yazi && echo -e "${GREEN}●${NC}" || echo -e "${RED}○${NC}" ;;
         theme)
-            if [[ -d "$HOME/powerlevel10k" ]] || [[ -d "$HOME/.local/share/sheldon/repos/github.com/romkatv/powerlevel10k" ]]; then
+            if command_exists starship || [[ -f "$HOME/.local/bin/starship" ]]; then
+                echo -e "${GREEN}● starship${NC}"
+            elif [[ -d "$HOME/powerlevel10k" ]] || [[ -d "$HOME/.local/share/sheldon/repos/github.com/romkatv/powerlevel10k" ]]; then
                 echo -e "${GREEN}● p10k${NC}"
             elif [[ -d "$HOME/.zsh/pure" ]] || [[ -d "$HOME/.local/share/sheldon/repos/github.com/sindresorhus/pure" ]]; then
                 echo -e "${GREEN}● pure${NC}"
@@ -1537,9 +1631,10 @@ main() {
             --theme)
                 shift
                 case "${1:-}" in
-                    pure)  SELECTED_THEME="pure"; THEME_SET_BY_FLAG=1 ;;
-                    p10k)  SELECTED_THEME="p10k"; THEME_SET_BY_FLAG=1 ;;
-                    *)     error "无效主题: ${1:-}（可选: p10k, pure）"; exit 1 ;;
+                    starship)  SELECTED_THEME="starship"; THEME_SET_BY_FLAG=1 ;;
+                    pure)      SELECTED_THEME="pure"; THEME_SET_BY_FLAG=1 ;;
+                    p10k)      SELECTED_THEME="p10k"; THEME_SET_BY_FLAG=1 ;;
+                    *)         error "无效主题: ${1:-}（可选: starship, p10k, pure）"; exit 1 ;;
                 esac
                 shift
                 ;;
@@ -1573,7 +1668,7 @@ main() {
             --help|-h)
                 echo "Linux 开发环境管理工具"
                 echo ""
-                echo "用法: $0 [--install | --uninstall] [--plugin-mgr sheldon|ohmyzsh] [--theme p10k|pure] [--components comp1 ...] [--help]"
+                echo "用法: $0 [--install | --uninstall] [--plugin-mgr sheldon|ohmyzsh] [--theme starship|p10k|pure] [--components comp1 ...] [--help]"
                 echo ""
                 echo "选项:"
                 echo "  --install              一键安装所有组件"
@@ -1582,9 +1677,11 @@ main() {
                 echo "                         指定插件管理器（默认: sheldon）"
                 echo "    sheldon  Sheldon      极速加载、TOML 配置、延迟加载"
                 echo "    ohmyzsh  Oh My Zsh    社区生态丰富、300+ 插件"
-                echo "  --theme p10k|pure      指定终端主题（默认: p10k）"
-                echo "    p10k   Powerlevel10k  高度可定制、丰富图标（需 Nerd Font）"
-                echo "    pure   Pure           极简美观、无需特殊字体"
+                echo "  --theme starship|p10k|pure"
+                echo "                         指定终端主题（默认: starship）"
+                echo "    starship Starship     极速渲染、跨 Shell、catppuccin-powerline 预设"
+                echo "    p10k     Powerlevel10k 高度可定制、丰富图标（需 Nerd Font）"
+                echo "    pure     Pure          极简美观、无需特殊字体"
                 echo "  --components comp1 [comp2 ...]"
                 echo "                         指定要安装的可选组件，不传则安装全部"
                 echo "                         例: --components rustup eza volta"
@@ -1597,7 +1694,7 @@ main() {
                 ;;
             *)
                 error "未知选项: $1"
-                echo "用法: $0 [--install | --uninstall] [--plugin-mgr sheldon|ohmyzsh] [--theme p10k|pure] [--components comp1 ...] [--help]"
+                echo "用法: $0 [--install | --uninstall] [--plugin-mgr sheldon|ohmyzsh] [--theme starship|p10k|pure] [--components comp1 ...] [--help]"
                 exit 1
                 ;;
         esac

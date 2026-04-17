@@ -16,7 +16,7 @@ docker desktop 基本上都安装过了，就不写到脚本了。
 
 - 子系统 Ubuntu-24.04
 - 插件管理 [Sheldon](https://github.com/rossmacarthur/sheldon)（默认）或 Oh My Zsh（可选）
-- 终端 zsh + powerlevel10k / pure + zsh-autosuggestions + zsh-syntax-highlighting
+- 终端 zsh + [Starship](https://starship.rs/)（默认）/ powerlevel10k / pure + zsh-autosuggestions + zsh-syntax-highlighting
 - 字体 MesloLGS NF
 - 工具 Rust, Volta（包含 node、npm、pnpm 的 latest 版本）, uv（python 的 3.14 版本）, proto, eza, yazi
 
@@ -74,7 +74,7 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/myxdhh/wsl2-ubuntu-one-c
 3. 配置 `.wslconfig`（网络镜像、内存回收、DNS 隧道等）
 4. 创建默认用户并配置 sudo 免密
 5. 选择插件管理器 (Sheldon 或 Oh My Zsh)
-6. 选择终端默认主题 (Powerlevel10k 或 Pure)
+6. 选择终端主题 (Starship / Powerlevel10k / Pure)
 7. 安装 MesloLGS Nerd Font 字体
 8. 选择要附加安装的开发工具 (Rust, Volta, uv, 等)
 9. 在子系统内自动完成环境初始化
@@ -84,11 +84,11 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/myxdhh/wsl2-ubuntu-one-c
 在已有的 Ubuntu / Debian 系统中，进入脚本所在目录：
 
 ```bash
-# 一键安装所有可选组件（默认插件管理器 Sheldon、主题 p10k）
+# 一键安装所有可选组件（默认插件管理器 Sheldon、主题 Starship）
 bash setup-dev-env.sh --install
 
 # 使用 Oh My Zsh 插件管理器并指定主题
-bash setup-dev-env.sh --install --plugin-mgr ohmyzsh --theme pure
+bash setup-dev-env.sh --install --plugin-mgr ohmyzsh --theme p10k
 
 # 仅安装部分组件
 bash setup-dev-env.sh --install --components rustup volta uv
@@ -109,6 +109,7 @@ bash setup-dev-env.sh
 | Zsh                     | Shell 环境                    | apt-get        |
 | Sheldon（默认）           | 插件管理器                      | 预编译二进制   |
 | Oh My Zsh（可选）         | 插件管理器                      | install script |
+| Starship（默认）         | 终端主题 (Rust 编写、极速渲染)  | 预编译二进制   |
 | Powerlevel10k           | 终端主题 (推荐，功能丰富)     | sheldon / git  |
 | Pure                    | 终端主题 (极简，无需特殊字体) | sheldon / git  |
 | zsh-autosuggestions     | 命令补全建议                  | sheldon / git  |
@@ -122,13 +123,16 @@ bash setup-dev-env.sh
 
 ## 安装后
 
-如果使用了 Powerlevel10k 主题，进入 WSL 子系统后，通常会提示配置向导。如果没有，可手动运行：
+- **Starship 主题**：已自动配置 catppuccin-powerline 预设，配置文件位于 `~/.config/starship.toml`
+- **Powerlevel10k 主题**：进入 WSL 子系统后，通常会提示配置向导。如果没有，可手动运行：
 
 ```bash
 p10k configure
 ```
 
-对于 Pure 主题，无需额外配置。如果发现终端图标（如在使用 eza 时）显示为乱码，说明宿主机缺少 **MesloLGS Nerd Font** 字体。请参照下方的常用命令在日常使用的客户端操作系统中安装**并配置终端字体（如 Windows Terminal、iTerm2、Wezterm 等）**：
+- **Pure 主题**：无需额外配置
+
+如果终端图标（如使用 eza 时）显示为乱码，说明宿主机缺少 **Nerd Font** 字体。请在终端软件（Windows Terminal、iTerm2 等）中配置字体为 **MesloLGS NF**：
 
 - **Windows / WSL 宿主机（管理员 PowerShell）**：
   `iex (iwr -useb https://raw.githubusercontent.com/romkatv/powerlevel10k-media/master/fonts.ps1)`

@@ -236,22 +236,30 @@ function Step-SelectPluginMgr {
 function Step-SelectTheme {
     Write-Header "步骤 4b: 选择默认终端主题"
 
-    Write-Host "  1) Powerlevel10k (默认)" -ForegroundColor Cyan
+    Write-Host "  1) Starship - catppuccin-powerline (默认)" -ForegroundColor Cyan
+    Write-Host "     优势：Rust 编写极速渲染、跨 Shell 统一、高度可定制、内置 git/语言检测" -ForegroundColor DarkGray
+    Write-Host "     注意：推荐安装 Nerd Font 以获得最佳图标体验" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "  2) Powerlevel10k" -ForegroundColor Cyan
     Write-Host "     优势：高度可定制、丰富图标、Git 状态即时显示、Instant Prompt 极速启动" -ForegroundColor DarkGray
     Write-Host "     注意：需要在宿主机安装 Nerd Font 字体" -ForegroundColor Yellow
     Write-Host ""
-    Write-Host "  2) Pure" -ForegroundColor Cyan
+    Write-Host "  3) Pure" -ForegroundColor Cyan
     Write-Host "     优势：极简美观、零配置、不依赖特殊字体、异步 Git 检测不阻塞输入" -ForegroundColor DarkGray
     Write-Host "     注意：宿主机无需安装任何特殊字体" -ForegroundColor Green
     Write-Host ""
 
     while ($true) {
-        $choice = Read-Host "请选择主题 (1/2) [默认: 1]"
+        $choice = Read-Host "请选择主题 (1/2/3) [默认: 1]"
         if ([string]::IsNullOrWhiteSpace($choice) -or $choice -eq "1") {
+            Write-Ok "已选择: Starship (catppuccin-powerline)"
+            return "starship"
+        }
+        elseif ($choice -eq "2") {
             Write-Ok "已选择: Powerlevel10k"
             return "p10k"
         }
-        elseif ($choice -eq "2") {
+        elseif ($choice -eq "3") {
             Write-Ok "已选择: Pure"
             return "pure"
         }
@@ -275,7 +283,7 @@ function Step-InstallFont {
         Write-Info "Pure 主题本身不需要特殊字体，但 eza 命令的文件图标需要 Nerd Font 字体才能正确显示"
     }
     else {
-        Write-Info "Powerlevel10k 主题和 eza 命令都需要 Nerd Font 字体才能正确显示图标"
+        Write-Info "$( if ($Theme -eq 'starship') { 'Starship 主题' } else { 'Powerlevel10k 主题' } )和 eza 命令都需要 Nerd Font 字体才能正确显示图标"
     }
     if (-not (Confirm-Action "是否安装 MesloLGS NF 字体并配置终端？" -DefaultYes)) {
         Write-Info "跳过字体安装"
@@ -1058,11 +1066,10 @@ function Main {
     Write-Host "  进入子系统:  " -ForegroundColor Yellow -NoNewline
     Write-Host "wsl -d $instanceName" -ForegroundColor White
     Write-Host ""
-    if ($theme -eq "pure") {
-        Write-Info "Pure 主题已配置，无需额外步骤"
-    }
-    else {
-        Write-Info "如使用 Powerlevel10k 主题，请在子系统内运行 p10k configure 配置主题偏好"
+    switch ($theme) {
+        "starship" { Write-Info "Starship (catppuccin-powerline) 主题已配置，配置文件: ~/.config/starship.toml" }
+        "pure"     { Write-Info "Pure 主题已配置，无需额外步骤" }
+        default    { Write-Info "如使用 Powerlevel10k 主题，请在子系统内运行 p10k configure 配置主题偏好" }
     }
     Write-Host ""
 }

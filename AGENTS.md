@@ -37,7 +37,7 @@ wsl2-ubuntu-one-click/
 步骤 2: 配置 .wslconfig（网络模式、DNS、内存回收等，合并已有配置）
 步骤 3: 创建 Linux 用户（含 sudo 免密、wsl.conf 默认用户配置）
 步骤 4a: 选择插件管理器（Sheldon 或 Oh My Zsh，默认 Sheldon）
-步骤 4b: 选择终端主题（Powerlevel10k 或 Pure）
+步骤 4b: 选择终端主题（Starship / Powerlevel10k / Pure，默认 Starship）
 步骤 5: 安装 MesloLGS Nerd Font 字体并配置 Windows Terminal
 步骤 6: 选择要安装的开发工具组件
 步骤 7: 将 setup-dev-env.sh 复制到子系统内并执行
