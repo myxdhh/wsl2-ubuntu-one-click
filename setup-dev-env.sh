@@ -102,7 +102,7 @@ COMPONENTS=(
     "plugin-mgr:插件管理器 (Sheldon/Oh My Zsh)"
     "theme:终端主题 (starship/p10k/pure)"
     "zsh-autosuggestions:zsh-autosuggestions 插件"
-    "zsh-syntax-highlighting:zsh-syntax-highlighting 插件"
+    "fast-syntax-highlighting:fast-syntax-highlighting 插件"
     "rustup:Rust 工具链 (rustup)"
     "eza:eza (现代 ls 替代)"
     "yazi:yazi (终端文件管理器)"
@@ -508,30 +508,30 @@ install_zsh_autosuggestions() {
     log_end "zsh-autosuggestions" $?
 }
 
-install_zsh_syntax_highlighting() {
-    header "安装 zsh-syntax-highlighting"
-    log_start "zsh-syntax-highlighting"
+install_fast_syntax_highlighting() {
+    header "安装 fast-syntax-highlighting"
+    log_start "fast-syntax-highlighting"
 
     # Sheldon 模式: 插件由 plugins.toml 管理
     if [[ "$SELECTED_PLUGIN_MGR" == "sheldon" ]]; then
-        info "Sheldon 模式: zsh-syntax-highlighting 将由 plugins.toml 统一管理"
-        log_end "zsh-syntax-highlighting" 0
+        info "Sheldon 模式: fast-syntax-highlighting 将由 plugins.toml 统一管理"
+        log_end "fast-syntax-highlighting" 0
         return 0
     fi
 
-    local target_dir="${ZSH_CUSTOM_DIR}/plugins/zsh-syntax-highlighting"
+    local target_dir="${ZSH_CUSTOM_DIR}/plugins/fast-syntax-highlighting"
     if [[ -d "$target_dir" ]]; then
-        success "zsh-syntax-highlighting 已安装"
+        success "fast-syntax-highlighting 已安装"
     else
         mkdir -p "${ZSH_CUSTOM_DIR}/plugins"
-        if ! git clone https://github.com/zsh-users/zsh-syntax-highlighting.git "$target_dir" 2>&1 | tee -a "$LOG_FILE"; then
-            record_failure "zsh-syntax-highlighting"
+        if ! git clone https://github.com/zdharma-continuum/fast-syntax-highlighting.git "$target_dir" 2>&1 | tee -a "$LOG_FILE"; then
+            record_failure "fast-syntax-highlighting"
             return 1
         fi
-        success "zsh-syntax-highlighting 安装完成"
+        success "fast-syntax-highlighting 安装完成"
     fi
 
-    log_end "zsh-syntax-highlighting" $?
+    log_end "fast-syntax-highlighting" $?
 }
 
 install_volta() {
@@ -683,8 +683,8 @@ apply = ["defer"]
 github = "zsh-users/zsh-autosuggestions"
 use = ["{{ name }}.zsh"]
 
-[plugins.zsh-syntax-highlighting]
-github = "zsh-users/zsh-syntax-highlighting"
+[plugins.fast-syntax-highlighting]
+github = "zdharma-continuum/fast-syntax-highlighting"
 apply = ["defer"]
 
 PLUGINS_BLOCK
@@ -841,7 +841,7 @@ ENV_BLOCK
             omz_template=$(cat << 'OMZ_TPL'
 export ZSH="$HOME/.oh-my-zsh"
 ZSH_THEME=""
-plugins=(git eza zsh-autosuggestions zsh-syntax-highlighting)
+plugins=(git eza zsh-autosuggestions fast-syntax-highlighting)
 
 # ── eza 插件配置（需在 source oh-my-zsh.sh 之前）──
 zstyle ':omz:plugins:eza' 'dirs-first' yes
@@ -860,7 +860,7 @@ OMZ_TPL
         fi
 
         # 更新 plugins 列表
-        local plugins_line='plugins=(git eza zsh-autosuggestions zsh-syntax-highlighting)'
+        local plugins_line='plugins=(git eza zsh-autosuggestions fast-syntax-highlighting)'
         if [[ -f "$zshrc" ]] && grep -q "^plugins=" "$zshrc"; then
             sed -i "s/^plugins=.*/${plugins_line}/" "$zshrc"
         fi
@@ -1010,14 +1010,14 @@ uninstall_zsh_autosuggestions() {
     fi
 }
 
-uninstall_zsh_syntax_highlighting() {
-    header "卸载 zsh-syntax-highlighting"
-    local target_dir="${ZSH_CUSTOM_DIR}/plugins/zsh-syntax-highlighting"
+uninstall_fast_syntax_highlighting() {
+    header "卸载 fast-syntax-highlighting"
+    local target_dir="${ZSH_CUSTOM_DIR}/plugins/fast-syntax-highlighting"
     if [[ -d "$target_dir" ]]; then
         rm -rf "$target_dir"
-        success "zsh-syntax-highlighting 已卸载"
+        success "fast-syntax-highlighting 已卸载"
     else
-        info "zsh-syntax-highlighting 未安装，跳过"
+        info "fast-syntax-highlighting 未安装，跳过"
     fi
 }
 
@@ -1250,7 +1250,7 @@ run_install_all() {
     install_plugin_mgr
     install_theme
     install_zsh_autosuggestions
-    install_zsh_syntax_highlighting
+    install_fast_syntax_highlighting
 
     # 可选组件
     should_install "rustup" && install_rustup
@@ -1282,7 +1282,7 @@ run_install_all() {
     esac
 
     echo "  • zsh-autosuggestions"
-    echo "  • zsh-syntax-highlighting"
+    echo "  • fast-syntax-highlighting"
 
     echo -e "\n${BOLD}可选组件配置结果：${NC}"
     should_install "rustup" && echo "  • Rust (rustup + cargo)"
@@ -1346,7 +1346,7 @@ run_uninstall_all() {
     uninstall_volta
     uninstall_yazi
     uninstall_eza
-    uninstall_zsh_syntax_highlighting
+    uninstall_fast_syntax_highlighting
     uninstall_zsh_autosuggestions
     uninstall_theme
     uninstall_rustup
@@ -1394,8 +1394,8 @@ show_status_indicator() {
                 echo -e "${RED}○${NC}"
             fi
             ;;
-        zsh-syntax-highlighting)
-            if [[ -d "${ZSH_CUSTOM_DIR}/plugins/zsh-syntax-highlighting" ]] || [[ -d "$HOME/.local/share/sheldon/repos/github.com/zsh-users/zsh-syntax-highlighting" ]]; then
+        fast-syntax-highlighting)
+            if [[ -d "${ZSH_CUSTOM_DIR}/plugins/fast-syntax-highlighting" ]] || [[ -d "$HOME/.local/share/sheldon/repos/github.com/zdharma-continuum/fast-syntax-highlighting" ]]; then
                 echo -e "${GREEN}●${NC}"
             else
                 echo -e "${RED}○${NC}"
@@ -1418,7 +1418,7 @@ interactive_menu() {
     fi
 
     # 基础组件 ID（安装时锁定必选，卸载时从列表排除）
-    local -a protected_ids=("apt-deps" "zsh" "plugin-mgr" "theme" "zsh-autosuggestions" "zsh-syntax-highlighting")
+    local -a protected_ids=("apt-deps" "zsh" "plugin-mgr" "theme" "zsh-autosuggestions" "fast-syntax-highlighting")
 
     _is_protected() {
         local id="$1"

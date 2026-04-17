@@ -817,9 +817,9 @@ function Step-SelectComponents {
     )
 
     if ($pluginMgr -eq "sheldon") {
-        Write-Host "  基础组件 (始终安装): Zsh, Sheldon, 主题, zsh-autosuggestions, zsh-syntax-highlighting" -ForegroundColor DarkGray
+        Write-Host "  基础组件 (始终安装): Zsh, Sheldon, 主题, zsh-autosuggestions, fast-syntax-highlighting" -ForegroundColor DarkGray
     } else {
-        Write-Host "  基础组件 (始终安装): Zsh, Oh My Zsh, 主题, zsh-autosuggestions, zsh-syntax-highlighting" -ForegroundColor DarkGray
+        Write-Host "  基础组件 (始终安装): Zsh, Oh My Zsh, 主题, zsh-autosuggestions, fast-syntax-highlighting" -ForegroundColor DarkGray
     }
     Write-Host ""
     Write-Host "  可选开发工具：" -ForegroundColor Cyan

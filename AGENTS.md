@@ -63,7 +63,7 @@ wsl2-ubuntu-one-click/
 
 **组件依赖链**：
 ```
-基础组件（始终安装）: apt-deps → zsh → plugin-mgr (sheldon/ohmyzsh) → theme → zsh-autosuggestions → zsh-syntax-highlighting
+基础组件（始终安装）: apt-deps → zsh → plugin-mgr (sheldon/ohmyzsh) → theme → zsh-autosuggestions → fast-syntax-highlighting
 可选组件: rustup → { eza, yazi }（cargo 编译）
 独立可选: volta, uv, proto
 ```
@@ -77,7 +77,7 @@ wsl2-ubuntu-one-click/
 - `install_plugin_mgr()` / `uninstall_plugin_mgr()` 为 dispatch 函数，委派到对应实现
 
 **Sheldon 模式特殊逻辑**：
-- 插件（zsh-autosuggestions, zsh-syntax-highlighting）和主题（p10k, pure）的 install 函数在 Sheldon 模式下为空操作
+- 插件（zsh-autosuggestions, fast-syntax-highlighting）和主题（p10k, pure）的 install 函数在 Sheldon 模式下为空操作
 - `configure_sheldon_plugins()` 生成 `~/.config/sheldon/plugins.toml`，并执行 `sheldon lock --update` 下载所有插件
 - `.zshrc` 使用 `eval "$(sheldon source)"` 代替 `source $ZSH/oh-my-zsh.sh`
 - eza aliases 通过 inline plugin 在 `plugins.toml` 中定义
