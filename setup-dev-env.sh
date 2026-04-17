@@ -4,8 +4,8 @@
 # 适用于 Ubuntu / Debian 系统（含 WSL2）
 #
 # 用法:
-#   bash setup-dev-env.sh --install                一键安装所有组件（无交互，默认 p10k 主题）
-#   bash setup-dev-env.sh --install --theme pure   一键安装（使用 pure 主题）
+#   bash setup-dev-env.sh --install                一键安装所有组件（无交互，默认 starship 主题）
+#   bash setup-dev-env.sh --install --theme p10k    一键安装（使用 p10k 主题）
 #   bash setup-dev-env.sh --uninstall              一键卸载所有组件（无交互）
 #   bash setup-dev-env.sh                          进入交互界面
 # =============================================================================
@@ -765,7 +765,7 @@ FZF_PLUGIN
     # zoxide integration
     cat >> "$plugins_toml" << 'ZOXIDE_PLUGIN'
 [plugins.zoxide]
-inline = '(( $+commands[zoxide] )) && eval "$(zoxide init zsh)"'
+inline = '(( $+commands[zoxide] )) && eval "$(zoxide init zsh --cmd cd)"'
 ZOXIDE_PLUGIN
 
     success "plugins.toml 已生成: $plugins_toml"
@@ -992,7 +992,7 @@ export PATH="$PROTO_HOME/shims:$PROTO_HOME/bin:$PATH"
 [[ -f "$HOME/.fzf.zsh" ]] && source "$HOME/.fzf.zsh"
 
 # ── zoxide ──
-(( $+commands[zoxide] )) && eval "$(zoxide init zsh)"
+(( $+commands[zoxide] )) && eval "$(zoxide init zsh --cmd cd)"
 
 # <<< one-click-dev-env <<<
 ENV_BLOCK

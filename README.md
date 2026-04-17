@@ -76,7 +76,7 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/myxdhh/wsl2-ubuntu-one-c
 5. 选择插件管理器 (Sheldon 或 Oh My Zsh)
 6. 选择终端主题 (Starship / Powerlevel10k / Pure)
 7. 安装 MesloLGS Nerd Font 字体
-8. 选择要附加安装的开发工具 (Rust, Volta, uv, 等)
+8. 选择要附加安装的开发工具 (fzf, zoxide, Rust, Volta, uv 等)
 9. 在子系统内自动完成环境初始化
 
 ### 独立使用 Linux 脚本 (本地执行)
@@ -104,24 +104,24 @@ bash setup-dev-env.sh
 
 ## 安装的组件
 
-| 组件                    | 用途                          | 管理工具       |
-| ----------------------- | ----------------------------- | -------------- |
-| Zsh                     | Shell 环境                    | apt-get        |
-| Sheldon（默认）           | 插件管理器                      | 预编译二进制   |
-| Oh My Zsh（可选）         | 插件管理器                      | install script |
-| Starship（默认）         | 终端主题 (Rust 编写、极速渲染)  | 预编译二进制   |
-| Powerlevel10k           | 终端主题 (推荐，功能丰富)     | sheldon / git  |
-| Pure                    | 终端主题 (极简，无需特殊字体) | sheldon / git  |
-| zsh-autosuggestions     | 命令补全建议                  | sheldon / git  |
-| fast-syntax-highlighting | 语法高亮（极速，Chroma 引擎）    | sheldon / git  |
+| 组件                     | 用途                          | 管理工具       |
+| ------------------------ | ----------------------------- | -------------- |
+| Zsh                      | Shell 环境                    | apt-get        |
+| Sheldon（默认）            | 插件管理器                    | 预编译二进制   |
+| Oh My Zsh（可选）          | 插件管理器                    | install script |
+| Starship（默认）           | 终端主题 (Rust 编写、极速渲染) | 预编译二进制   |
+| Powerlevel10k            | 终端主题 (功能丰富)          | sheldon / git  |
+| Pure                     | 终端主题 (极简、无需特殊字体) | sheldon / git  |
+| zsh-autosuggestions      | 命令补全建议                  | sheldon / git  |
+| fast-syntax-highlighting | 语法高亮 (极速、Chroma 引擎) | sheldon / git  |
 | fzf                      | 模糊搜索                      | git clone      |
-| zoxide                   | 智能 cd                       | install script |
-| eza                     | 现代 `ls` 替代                | cargo          |
-| yazi                    | 终端文件管理器                | cargo          |
-| Rust (rustup)           | Rust 开发环境                 | rustup         |
-| Volta                   | Node/npm/pnpm 版本管理        | volta          |
-| uv                      | Python 版本管理               | uv             |
-| proto                   | 多语言版本管理                | proto          |
+| zoxide                   | 智能 cd (覆盖原生 cd)         | install script |
+| eza                      | 现代 `ls` 替代                | cargo          |
+| yazi                     | 终端文件管理器                | cargo          |
+| Rust (rustup)            | Rust 开发环境                 | rustup         |
+| Volta                    | Node/npm/pnpm 版本管理        | volta          |
+| uv                       | Python 版本管理               | uv             |
+| proto                    | 多语言版本管理                | proto          |
 
 ## 安装后
 
