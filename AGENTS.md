@@ -174,32 +174,7 @@ install_example() {
 
 ## 测试建议
 
-项目提供 `Dockerfile` 用于在 Ubuntu 24.04 容器中进行集成测试：
-
-```bash
-# 构建测试镜像
-docker build -t wsl-dev-test .
-
-# 进入容器交互测试
-docker run -it --rm wsl-dev-test
-
-# 测试完毕后清理
-docker rmi wsl-dev-test && docker builder prune -f
-```
-
-修改后建议覆盖以下验证：
-
-1. **语法检查**：
-   - PowerShell: 在 PowerShell 中运行 `powershell -Command "& { Get-Content setup-wsl.ps1 | Out-Null }"` 或使用 PSScriptAnalyzer
-   - Bash: `bash -n setup-dev-env.sh`（语法检查）和 `shellcheck setup-dev-env.sh`（静态分析）
-
-2. **幂等性验证**：在已安装环境中重复执行脚本，确认不会产生副作用
-
-3. **单组件测试**：使用交互模式单独安装/卸载特定组件
-
-4. **插件管理器切换**：验证 Sheldon ↔ Oh My Zsh 切换后 `.zshrc` 配置正确覆盖
-
-5. **主题切换**：验证 Starship / Powerlevel10k / Pure 之间切换正确生效
+@TESTING.md
 
 ## 语言与本地化
 
