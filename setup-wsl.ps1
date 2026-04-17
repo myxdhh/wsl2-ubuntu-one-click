@@ -273,18 +273,12 @@ function Step-SelectTheme {
 # 步骤 5: 安装 Nerd Font 字体
 # =============================================================================
 function Step-InstallFont {
-    param(
-        [string]$Theme
-    )
-
     Write-Header "步骤 5: 安装 MesloLGS Nerd Font"
 
-    if ($Theme -eq "pure") {
-        Write-Info "Pure 主题本身不需要特殊字体，但 eza 命令的文件图标需要 Nerd Font 字体才能正确显示"
-    }
-    else {
-        Write-Info "$( if ($Theme -eq 'starship') { 'Starship 主题' } else { 'Powerlevel10k 主题' } )和 eza 命令都需要 Nerd Font 字体才能正确显示图标"
-    }
+    Write-Info "以下内容需要 Nerd Font 字体才能正确显示图标："
+    Write-Host "  • 终端主题（Starship / Powerlevel10k）的图标与符号" -ForegroundColor DarkGray
+    Write-Host "  • eza 命令的文件/文件夹图标" -ForegroundColor DarkGray
+    Write-Host ""
     if (-not (Confirm-Action "是否安装 MesloLGS NF 字体并配置终端？" -DefaultYes)) {
         Write-Info "跳过字体安装"
         return
@@ -1013,7 +1007,7 @@ function Main {
     Write-Host "    2) 配置 .wslconfig" -ForegroundColor DarkGray
     Write-Host "    3) 创建用户（含 sudo 免密）" -ForegroundColor DarkGray
     Write-Host "    4) 选择插件管理器和终端主题" -ForegroundColor DarkGray
-    Write-Host "    5) 安装 MesloLGS Nerd Font 字体（依据主题选择）" -ForegroundColor DarkGray
+    Write-Host "    5) 安装 MesloLGS Nerd Font 字体" -ForegroundColor DarkGray
     Write-Host "    6) 选择要安装的开发工具" -ForegroundColor DarkGray
     Write-Host "    7) 执行 Linux 开发环境安装脚本" -ForegroundColor DarkGray
     Write-Host ""
