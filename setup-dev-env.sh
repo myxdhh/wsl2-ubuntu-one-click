@@ -756,6 +756,17 @@ configure_zshrc() {
 
     if [[ "$SELECTED_PLUGIN_MGR" == "sheldon" ]]; then
         # ── Sheldon 模式 ──
+
+        # 清理 oh-my-zsh 模板行（避免 ohmyzsh 与 sheldon 双重加载）
+        if [[ -f "$zshrc" ]]; then
+            sed -i '/^export ZSH=.*\.oh-my-zsh/d' "$zshrc"
+            sed -i '/^ZSH_THEME=/d' "$zshrc"
+            sed -i '/^plugins=(/d' "$zshrc"
+            sed -i '/^source.*oh-my-zsh\.sh/d' "$zshrc"
+            sed -i "/^zstyle ':omz:plugins:eza'/d" "$zshrc"
+            sed -i '/^# ── eza 插件配置/d' "$zshrc"
+        fi
+
         # 生成 plugins.toml 并下载插件
         configure_sheldon_plugins
 
@@ -820,9 +831,29 @@ ENV_BLOCK
 
         success ".zshrc 配置完成 (插件管理器: Sheldon, 主题: $SELECTED_THEME)"
     else
-        # ── Oh My Zsh 模式（原有逻辑）──
+        # ── Oh My Zsh 模式 ──
 
-        # 确保基础 oh-my-zsh 配置存在
+        # 确保 oh-my-zsh 基础模板存在（从 Sheldon 切换过来时可能缺失）
+        if [[ -f "$zshrc" ]] && ! grep -q "^source.*oh-my-zsh\.sh" "$zshrc"; then
+            info "检测到 .zshrc 缺少 oh-my-zsh 模板，正在补充..."
+            # 在文件开头插入 oh-my-zsh 模板
+            local omz_template
+            omz_template=$(cat << 'OMZ_TPL'
+export ZSH="$HOME/.oh-my-zsh"
+ZSH_THEME=""
+plugins=(git eza zsh-autosuggestions zsh-syntax-highlighting)
+
+# ── eza 插件配置（需在 source oh-my-zsh.sh 之前）──
+zstyle ':omz:plugins:eza' 'dirs-first' yes
+zstyle ':omz:plugins:eza' 'icons' yes
+zstyle ':omz:plugins:eza' 'hyperlink' yes
+
+source $ZSH/oh-my-zsh.sh
+OMZ_TPL
+)
+            # 将模板插入到文件开头
+            printf '%s\n\n' "$omz_template" | cat - "$zshrc" > "${zshrc}.tmp" && mv "${zshrc}.tmp" "$zshrc"
+        fi
         if [[ -f "$zshrc" ]] && grep -q "^ZSH_THEME=" "$zshrc"; then
             # 替换主题为空（我们使用外部主题 p10k/pure）
             sed -i 's/^ZSH_THEME=.*/ZSH_THEME=""/' "$zshrc"
