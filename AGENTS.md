@@ -22,6 +22,7 @@ wsl2-ubuntu-one-click/
 ├── setup-wsl.ps1        # Windows 宿主机脚本 — 编排 WSL2 完整安装流程
 ├── setup-dev-env.sh     # Linux 环境脚本 — 独立的开发工具安装/卸载管理器
 ├── Dockerfile           # 测试环境 — Ubuntu 24.04 容器
+├── TESTING.md           # 测试用例与验收标准
 └── .dockerignore        # Docker 构建上下文排除规则
 ```
 
