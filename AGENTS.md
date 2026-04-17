@@ -88,6 +88,14 @@ wsl2-ubuntu-one-click/
 - Oh My Zsh 模式：eza 的 `zstyle` 配置插入在 `source oh-my-zsh.sh` **之前**（这是 oh-my-zsh 插件系统的要求）
 - Sheldon 模式：无需 oh-my-zsh 相关配置，所有插件通过 `plugins.toml` 管理
 - 每次配置前自动备份 `.zshrc`，仅保留最近 3 个备份
+- **插件管理器切换**：切换到 Sheldon 时自动清理 oh-my-zsh 模板行（`source oh-my-zsh.sh` 等）；切换到 Oh My Zsh 时自动补充缺失的模板
+
+**卸载不清除配置文件（设计决策）**：
+- 单独卸载某个组件时，**不会**从 `plugins.toml` 或 `.zshrc` 中移除对应的 init 行
+- 原因 1：所有 init 行均使用守卫条件（`$+commands[...]`、`[[ -f ... ]]`），组件不存在时自动跳过，零开销
+- 原因 2：配置生成是声明式模板，不依赖组件安装状态，即使重新生成也输出相同内容
+- 原因 3：保留配置意味着重装组件后无需重新配置，开箱即用
+- 全量卸载（`--uninstall`）会通过 `remove_zshrc_config()` 完整清理所有配置
 
 ## 开发规范
 
