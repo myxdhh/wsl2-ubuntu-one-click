@@ -1,0 +1,7 @@
+.git
+*.md
+AGENTS.md
+setup-wsl.ps1
+Dockerfile
+.dockerignore
+.gemini

@@ -146,3 +146,45 @@ p10k configure
 - 分发版使用 `--web-download` 模式下载，需要网络连接
 - **网络要求**：脚本在安装过程中不会自动配置任何国内镜像源（如 apt, npm, rustup 等），请确保您的网络环境能够顺畅访问外网（如 GitHub 等），否则可能导致下载极其缓慢或安装失败
 - eza 和 yazi 通过 cargo 编译安装，首次安装耗时较长
+
+## 测试
+
+项目提供 Dockerfile 用于在 Ubuntu 24.04 容器中测试 `setup-dev-env.sh`：
+
+```bash
+# 1. 构建测试镜像
+docker build -t wsl-dev-test .
+
+# 2. 进入容器交互测试
+docker run -it --rm wsl-dev-test
+
+# 容器内测试命令示例：
+
+# 一键安装（默认 Sheldon + Starship）
+bash setup-dev-env.sh --install
+
+# 指定 Oh My Zsh + Powerlevel10k
+bash setup-dev-env.sh --install --plugin-mgr ohmyzsh --theme p10k
+
+# 切换测试：从 Sheldon 切换到 Oh My Zsh（验证配置覆盖）
+bash setup-dev-env.sh --install --plugin-mgr sheldon --theme starship
+bash setup-dev-env.sh --install --plugin-mgr ohmyzsh --theme p10k
+
+# 仅安装部分组件
+bash setup-dev-env.sh --install --components volta uv
+
+# 交互模式
+bash setup-dev-env.sh
+
+# 一键卸载
+bash setup-dev-env.sh --uninstall
+
+# 语法检查
+bash -n setup-dev-env.sh
+```
+
+```bash
+# 3. 测试完毕后清理
+docker rmi wsl-dev-test          # 删除镜像
+docker builder prune -f          # 清理构建缓存
+```
