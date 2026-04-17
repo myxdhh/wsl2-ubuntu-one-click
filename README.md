@@ -114,6 +114,8 @@ bash setup-dev-env.sh
 | Pure                     | 终端主题 (极简、无需特殊字体) | sheldon / git  |
 | zsh-autosuggestions      | 命令补全建议                  | sheldon / git  |
 | fast-syntax-highlighting | 语法高亮 (极速、Chroma 引擎) | sheldon / git  |
+| fzf-tab                  | Tab 补全 fzf 界面             | sheldon / git  |
+| zsh-completions          | 300+ 命令补全定义          | sheldon / git  |
 | fzf                      | 模糊搜索                      | git clone      |
 | zoxide                   | 智能 cd (覆盖原生 cd)         | install script |
 | eza                      | 现代 `ls` 替代                | cargo          |

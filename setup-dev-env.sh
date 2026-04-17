@@ -103,6 +103,8 @@ COMPONENTS=(
     "theme:终端主题 (starship/p10k/pure)"
     "zsh-autosuggestions:zsh-autosuggestions 插件"
     "fast-syntax-highlighting:fast-syntax-highlighting 插件"
+    "fzf-tab:fzf-tab (模糊补全)"
+    "zsh-completions:zsh-completions (补全定义)"
     "fzf:fzf (模糊搜索)"
     "zoxide:zoxide (智能 cd)"
     "rustup:Rust 工具链 (rustup)"
@@ -536,6 +538,58 @@ install_fast_syntax_highlighting() {
     log_end "fast-syntax-highlighting" $?
 }
 
+install_fzf_tab() {
+    header "安装 fzf-tab"
+    log_start "fzf-tab"
+
+    # Sheldon 模式: 插件由 plugins.toml 管理
+    if [[ "$SELECTED_PLUGIN_MGR" == "sheldon" ]]; then
+        info "Sheldon 模式: fzf-tab 将由 plugins.toml 统一管理"
+        log_end "fzf-tab" 0
+        return 0
+    fi
+
+    local target_dir="${ZSH_CUSTOM_DIR}/plugins/fzf-tab"
+    if [[ -d "$target_dir" ]]; then
+        success "fzf-tab 已安装"
+    else
+        mkdir -p "${ZSH_CUSTOM_DIR}/plugins"
+        if ! git clone https://github.com/Aloxaf/fzf-tab "$target_dir" 2>&1 | tee -a "$LOG_FILE"; then
+            record_failure "fzf-tab"
+            return 1
+        fi
+        success "fzf-tab 安装完成"
+    fi
+
+    log_end "fzf-tab" $?
+}
+
+install_zsh_completions() {
+    header "安装 zsh-completions"
+    log_start "zsh-completions"
+
+    # Sheldon 模式: 插件由 plugins.toml 管理
+    if [[ "$SELECTED_PLUGIN_MGR" == "sheldon" ]]; then
+        info "Sheldon 模式: zsh-completions 将由 plugins.toml 统一管理"
+        log_end "zsh-completions" 0
+        return 0
+    fi
+
+    local target_dir="${ZSH_CUSTOM_DIR}/plugins/zsh-completions"
+    if [[ -d "$target_dir" ]]; then
+        success "zsh-completions 已安装"
+    else
+        mkdir -p "${ZSH_CUSTOM_DIR}/plugins"
+        if ! git clone https://github.com/zsh-users/zsh-completions "$target_dir" 2>&1 | tee -a "$LOG_FILE"; then
+            record_failure "zsh-completions"
+            return 1
+        fi
+        success "zsh-completions 安装完成"
+    fi
+
+    log_end "zsh-completions" $?
+}
+
 install_fzf() {
     header "安装 fzf (模糊搜索)"
     log_start "fzf"
@@ -717,8 +771,27 @@ THEME_P10K
             ;;
     esac
 
-    # 插件
+    # 补全定义（必须在 compinit 之前）
+    cat >> "$plugins_toml" << 'COMPLETIONS_BLOCK'
+[plugins.zsh-completions]
+github = "zsh-users/zsh-completions"
+dir = "src"
+apply = ["fpath"]
+
+COMPLETIONS_BLOCK
+
+    # compinit（初始化补全系统，必须在 fzf-tab 之前）
+    cat >> "$plugins_toml" << 'COMPINIT_BLOCK'
+[plugins.compinit]
+inline = 'autoload -Uz compinit && compinit -C'
+
+COMPINIT_BLOCK
+
+    # 插件（顺序：fzf-tab → ohmyzsh-git → autosuggestions → syntax-highlighting）
     cat >> "$plugins_toml" << 'PLUGINS_BLOCK'
+[plugins.fzf-tab]
+github = "Aloxaf/fzf-tab"
+
 [plugins.ohmyzsh-git]
 github = "ohmyzsh/ohmyzsh"
 use = ["plugins/git/git.plugin.zsh"]
@@ -739,11 +812,11 @@ PLUGINS_BLOCK
 [plugins.eza-aliases]
 inline = '''
 if (( $+commands[eza] )); then
-  alias ls='eza --icons --group-directories-first'
-  alias ll='eza -la --icons --group-directories-first'
+  alias ls='eza --icons --group-directories-first --git'
+  alias ll='eza -la --icons --group-directories-first --git'
   alias la='eza -a --icons --group-directories-first'
   alias lt='eza --tree --icons --group-directories-first --level=2'
-  alias l='eza -l --icons --group-directories-first'
+  alias l='eza -l --icons --group-directories-first --git'
 fi
 '''
 
@@ -868,6 +941,17 @@ STARSHIP_INIT
 
             cat << 'ENV_BLOCK'
 
+# ── Zsh History ──
+HISTFILE="$HOME/.zsh_history"
+HISTSIZE=50000
+SAVEHIST=50000
+setopt HIST_IGNORE_DUPS
+setopt HIST_IGNORE_ALL_DUPS
+setopt HIST_FIND_NO_DUPS
+setopt HIST_REDUCE_BLANKS
+setopt SHARE_HISTORY
+setopt APPEND_HISTORY
+
 # ── Volta ──
 export VOLTA_HOME="$HOME/.volta"
 export VOLTA_FEATURE_PNPM=1
@@ -899,7 +983,7 @@ ENV_BLOCK
             omz_template=$(cat << 'OMZ_TPL'
 export ZSH="$HOME/.oh-my-zsh"
 ZSH_THEME=""
-plugins=(git eza zsh-autosuggestions fast-syntax-highlighting)
+plugins=(git eza fzf-tab zsh-completions zsh-autosuggestions fast-syntax-highlighting)
 
 # ── eza 插件配置（需在 source oh-my-zsh.sh 之前）──
 zstyle ':omz:plugins:eza' 'dirs-first' yes
@@ -918,7 +1002,7 @@ OMZ_TPL
         fi
 
         # 更新 plugins 列表
-        local plugins_line='plugins=(git eza zsh-autosuggestions fast-syntax-highlighting)'
+        local plugins_line='plugins=(git eza fzf-tab zsh-completions zsh-autosuggestions fast-syntax-highlighting)'
         if [[ -f "$zshrc" ]] && grep -q "^plugins=" "$zshrc"; then
             sed -i "s/^plugins=.*/${plugins_line}/" "$zshrc"
         fi
@@ -972,6 +1056,17 @@ P10K_BLOCK
             esac
 
             cat << 'ENV_BLOCK'
+
+# ── Zsh History ──
+HISTFILE="$HOME/.zsh_history"
+HISTSIZE=50000
+SAVEHIST=50000
+setopt HIST_IGNORE_DUPS
+setopt HIST_IGNORE_ALL_DUPS
+setopt HIST_FIND_NO_DUPS
+setopt HIST_REDUCE_BLANKS
+setopt SHARE_HISTORY
+setopt APPEND_HISTORY
 
 # ── Volta ──
 export VOLTA_HOME="$HOME/.volta"
@@ -1107,6 +1202,28 @@ uninstall_fast_syntax_highlighting() {
         success "fast-syntax-highlighting 已卸载"
     else
         info "fast-syntax-highlighting 未安装，跳过"
+    fi
+}
+
+uninstall_fzf_tab() {
+    header "卸载 fzf-tab"
+    local target_dir="${ZSH_CUSTOM_DIR}/plugins/fzf-tab"
+    if [[ -d "$target_dir" ]]; then
+        rm -rf "$target_dir"
+        success "fzf-tab 已卸载"
+    else
+        info "fzf-tab 未安装，跳过"
+    fi
+}
+
+uninstall_zsh_completions() {
+    header "卸载 zsh-completions"
+    local target_dir="${ZSH_CUSTOM_DIR}/plugins/zsh-completions"
+    if [[ -d "$target_dir" ]]; then
+        rm -rf "$target_dir"
+        success "zsh-completions 已卸载"
+    else
+        info "zsh-completions 未安装，跳过"
     fi
 }
 
@@ -1340,6 +1457,8 @@ run_install_all() {
     install_theme
     install_zsh_autosuggestions
     install_fast_syntax_highlighting
+    install_fzf_tab
+    install_zsh_completions
 
     # 可选组件
     should_install "fzf" && install_fzf
@@ -1374,6 +1493,8 @@ run_install_all() {
 
     echo "  • zsh-autosuggestions"
     echo "  • fast-syntax-highlighting"
+    echo "  • fzf-tab"
+    echo "  • zsh-completions"
 
     echo -e "\n${BOLD}可选组件配置结果：${NC}"
     should_install "fzf" && echo "  • fzf (模糊搜索)"
@@ -1442,6 +1563,8 @@ run_uninstall_all() {
     uninstall_zoxide
     uninstall_fzf
     uninstall_fast_syntax_highlighting
+    uninstall_fzf_tab
+    uninstall_zsh_completions
     uninstall_zsh_autosuggestions
     uninstall_theme
     uninstall_rustup
@@ -1496,6 +1619,20 @@ show_status_indicator() {
                 echo -e "${RED}○${NC}"
             fi
             ;;
+        fzf-tab)
+            if [[ -d "${ZSH_CUSTOM_DIR}/plugins/fzf-tab" ]] || [[ -d "$HOME/.local/share/sheldon/repos/github.com/Aloxaf/fzf-tab" ]]; then
+                echo -e "${GREEN}●${NC}"
+            else
+                echo -e "${RED}○${NC}"
+            fi
+            ;;
+        zsh-completions)
+            if [[ -d "${ZSH_CUSTOM_DIR}/plugins/zsh-completions" ]] || [[ -d "$HOME/.local/share/sheldon/repos/github.com/zsh-users/zsh-completions" ]]; then
+                echo -e "${GREEN}●${NC}"
+            else
+                echo -e "${RED}○${NC}"
+            fi
+            ;;
         fzf)          command_exists fzf && echo -e "${GREEN}●${NC}" || echo -e "${RED}○${NC}" ;;
         zoxide)       command_exists zoxide && echo -e "${GREEN}●${NC}" || echo -e "${RED}○${NC}" ;;
         volta)        command_exists volta && echo -e "${GREEN}●${NC}" || echo -e "${RED}○${NC}" ;;
@@ -1515,7 +1652,7 @@ interactive_menu() {
     fi
 
     # 基础组件 ID（安装时锁定必选，卸载时从列表排除）
-    local -a protected_ids=("apt-deps" "zsh" "plugin-mgr" "theme" "zsh-autosuggestions" "fast-syntax-highlighting")
+    local -a protected_ids=("apt-deps" "zsh" "plugin-mgr" "theme" "zsh-autosuggestions" "fast-syntax-highlighting" "fzf-tab" "zsh-completions")
 
     _is_protected() {
         local id="$1"
