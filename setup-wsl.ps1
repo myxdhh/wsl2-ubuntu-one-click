@@ -205,8 +205,36 @@ function Step-Prerequisites {
 # =============================================================================
 # 步骤 4: 选择终端主题
 # =============================================================================
+function Step-SelectPluginMgr {
+    Write-Header "步骤 4a: 选择插件管理器"
+
+    Write-Host "  1) Sheldon (默认)" -ForegroundColor Cyan
+    Write-Host "     优势：Rust 编写极速加载、TOML 配置清晰、延迟加载支持、插件并行安装" -ForegroundColor DarkGray
+    Write-Host "     注意：不包含 oh-my-zsh 内置插件/主题生态" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "  2) Oh My Zsh" -ForegroundColor Cyan
+    Write-Host "     优势：社区生态丰富、内置 300+ 插件/140+ 主题、文档完善" -ForegroundColor DarkGray
+    Write-Host "     注意：启动速度稍慢、插件需手动 git clone" -ForegroundColor Yellow
+    Write-Host ""
+
+    while ($true) {
+        $choice = Read-Host "请选择插件管理器 (1/2) [默认: 1]"
+        if ([string]::IsNullOrWhiteSpace($choice) -or $choice -eq "1") {
+            Write-Ok "已选择: Sheldon"
+            return "sheldon"
+        }
+        elseif ($choice -eq "2") {
+            Write-Ok "已选择: Oh My Zsh"
+            return "ohmyzsh"
+        }
+        else {
+            Write-Err "无效输入，请重新选择"
+        }
+    }
+}
+
 function Step-SelectTheme {
-    Write-Header "步骤 4: 选择默认终端主题"
+    Write-Header "步骤 4b: 选择默认终端主题"
 
     Write-Host "  1) Powerlevel10k (默认)" -ForegroundColor Cyan
     Write-Host "     优势：高度可定制、丰富图标、Git 状态即时显示、Instant Prompt 极速启动" -ForegroundColor DarkGray
@@ -771,6 +799,10 @@ fi
 # 步骤 6: 选择要安装的开发工具
 # =============================================================================
 function Step-SelectComponents {
+    param(
+        [string]$PluginMgr = "sheldon"
+    )
+
     Write-Header "步骤 6: 选择要安装的开发工具"
 
     $components = @(
@@ -784,7 +816,11 @@ function Step-SelectComponents {
         @{ Id = "proto"; Name = "proto (多语言版本管理)" }
     )
 
-    Write-Host "  基础组件 (始终安装): Zsh, Oh My Zsh, 终端主题" -ForegroundColor DarkGray
+    if ($pluginMgr -eq "sheldon") {
+        Write-Host "  基础组件 (始终安装): Zsh, Sheldon, 终端主题" -ForegroundColor DarkGray
+    } else {
+        Write-Host "  基础组件 (始终安装): Zsh, Oh My Zsh, 终端主题" -ForegroundColor DarkGray
+    }
     Write-Host ""
     Write-Host "  可选开发工具：" -ForegroundColor Cyan
 
@@ -832,6 +868,7 @@ function Step-RunDevEnvScript {
     param(
         [string]$InstanceName,
         [string]$Username,
+        [string]$PluginMgr,
         [string]$Theme,
         [string]$Components
     )
@@ -894,6 +931,9 @@ function Step-RunDevEnvScript {
 
     # 执行脚本
     $cmd = "bash ~/setup-dev-env.sh --install --auto-cleanup"
+    if (-not [string]::IsNullOrEmpty($PluginMgr)) {
+        $cmd += " --plugin-mgr $PluginMgr"
+    }
     if (-not [string]::IsNullOrEmpty($Theme)) {
         $cmd += " --theme $Theme"
     }
@@ -966,7 +1006,7 @@ function Main {
     Write-Host "    1) 选择并安装 Linux 分发版" -ForegroundColor DarkGray
     Write-Host "    2) 配置 .wslconfig" -ForegroundColor DarkGray
     Write-Host "    3) 创建用户（含 sudo 免密）" -ForegroundColor DarkGray
-    Write-Host "    4) 选择终端默认主题 (p10k/pure)" -ForegroundColor DarkGray
+    Write-Host "    4) 选择插件管理器和终端主题" -ForegroundColor DarkGray
     Write-Host "    5) 安装 MesloLGS Nerd Font 字体（依据主题选择）" -ForegroundColor DarkGray
     Write-Host "    6) 选择要安装的开发工具" -ForegroundColor DarkGray
     Write-Host "    7) 执行 Linux 开发环境安装脚本" -ForegroundColor DarkGray
@@ -984,14 +1024,17 @@ function Main {
     # 步骤 3: 创建用户
     $username = Step-CreateUser -InstanceName $instanceName
 
-    # 步骤 4: 选择主题
+    # 步骤 4a: 选择插件管理器
+    $pluginMgr = Step-SelectPluginMgr
+
+    # 步骤 4b: 选择主题
     $theme = Step-SelectTheme
 
     # 步骤 5: 安装字体
     Step-InstallFont -Theme $theme
 
     # 步骤 6: 选择组件
-    $components = Step-SelectComponents
+    $components = Step-SelectComponents -PluginMgr $pluginMgr
 
     # 关闭 WSL 使 .wslconfig + wsl.conf 生效
     Write-Info "正在重启 WSL 以应用配置..."
@@ -999,7 +1042,7 @@ function Main {
     Start-Sleep -Seconds 3
 
     # 步骤 7: 执行开发环境脚本
-    Step-RunDevEnvScript -InstanceName $instanceName -Username $username -Theme $theme -Components $components
+    Step-RunDevEnvScript -InstanceName $instanceName -Username $username -PluginMgr $pluginMgr -Theme $theme -Components $components
 
     $elapsed = (Get-Date) - $startTime
     $elapsedStr = "{0:D2}:{1:D2}:{2:D2}" -f $elapsed.Hours, $elapsed.Minutes, $elapsed.Seconds
@@ -1008,6 +1051,11 @@ function Main {
     Write-Header "🎉 全部完成！(耗时 $elapsedStr)"
     Write-Host "  分发版: $instanceName" -ForegroundColor Green
     Write-Host "  用户名: $username" -ForegroundColor Green
+    if ($pluginMgr -eq "sheldon") {
+        Write-Host "  插件管理器: Sheldon" -ForegroundColor Green
+    } else {
+        Write-Host "  插件管理器: Oh My Zsh" -ForegroundColor Green
+    }
     Write-Host ""
     Write-Host "  进入子系统:  " -ForegroundColor Yellow -NoNewline
     Write-Host "wsl -d $instanceName" -ForegroundColor White

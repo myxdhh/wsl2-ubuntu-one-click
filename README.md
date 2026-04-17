@@ -15,7 +15,8 @@ docker desktop 基本上都安装过了，就不写到脚本了。
 总览
 
 - 子系统 Ubuntu-24.04
-- 终端 zsh + oh my zsh + powerlevel10k / pure + zsh-autosuggestions + zsh-syntax-highlighting
+- 插件管理 [Sheldon](https://github.com/rossmacarthur/sheldon)（默认）或 Oh My Zsh（可选）
+- 终端 zsh + powerlevel10k / pure + zsh-autosuggestions + zsh-syntax-highlighting
 - 字体 MesloLGS NF
 - 工具 Rust, Volta（包含 node、npm、pnpm 的 latest 版本）, uv（python 的 3.14 版本）, proto, eza, yazi
 
@@ -72,18 +73,22 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/myxdhh/wsl2-ubuntu-one-c
 2. 选择并安装分发版（Ubuntu-24.04 / 22.04 / 20.04 / Debian）-> 目前只验证过 Ubuntu-24.04
 3. 配置 `.wslconfig`（网络镜像、内存回收、DNS 隧道等）
 4. 创建默认用户并配置 sudo 免密
-5. 选择终端默认主题 (Powerlevel10k 或 Pure)
-6. 安装 MesloLGS Nerd Font 字体
-7. 选择要附加安装的开发工具 (Rust, Volta, uv, 等)
-8. 在子系统内自动完成环境初始化
+5. 选择插件管理器 (Sheldon 或 Oh My Zsh)
+6. 选择终端默认主题 (Powerlevel10k 或 Pure)
+7. 安装 MesloLGS Nerd Font 字体
+8. 选择要附加安装的开发工具 (Rust, Volta, uv, 等)
+9. 在子系统内自动完成环境初始化
 
 ### 独立使用 Linux 脚本 (本地执行)
 
 在已有的 Ubuntu / Debian 系统中，进入脚本所在目录：
 
 ```bash
-# 一键安装所有可选组件（默认主题 p10k）
+# 一键安装所有可选组件（默认插件管理器 Sheldon、主题 p10k）
 bash setup-dev-env.sh --install
+
+# 使用 Oh My Zsh 插件管理器并指定主题
+bash setup-dev-env.sh --install --plugin-mgr ohmyzsh --theme pure
 
 # 指定主题并仅安装部分组件
 bash setup-dev-env.sh --install --theme pure --components "rustup,volta,uv"
@@ -97,19 +102,21 @@ bash setup-dev-env.sh
 
 ## 安装的组件
 
-| 组件                    | 用途                          | 管理工具 |
-| ----------------------- | ----------------------------- | -------- |
-| Zsh + Oh My Zsh         | Shell 环境                    | apt-get  |
-| Powerlevel10k           | 终端主题 (推荐，功能丰富)     | git      |
-| Pure                    | 终端主题 (极简，无需特殊字体) | git      |
-| zsh-autosuggestions     | 命令补全建议                  | git      |
-| zsh-syntax-highlighting | 语法高亮                      | git      |
-| eza                     | 现代 `ls` 替代                | cargo    |
-| yazi                    | 终端文件管理器                | cargo    |
-| Rust (rustup)           | Rust 开发环境                 | rustup   |
-| Volta                   | Node/npm/pnpm 版本管理        | volta    |
-| uv                      | Python 版本管理               | uv       |
-| proto                   | 多语言版本管理                | proto    |
+| 组件                    | 用途                          | 管理工具       |
+| ----------------------- | ----------------------------- | -------------- |
+| Zsh                     | Shell 环境                    | apt-get        |
+| Sheldon（默认）           | 插件管理器                      | 预编译二进制   |
+| Oh My Zsh（可选）         | 插件管理器                      | install script |
+| Powerlevel10k           | 终端主题 (推荐，功能丰富)     | sheldon / git  |
+| Pure                    | 终端主题 (极简，无需特殊字体) | sheldon / git  |
+| zsh-autosuggestions     | 命令补全建议                  | sheldon / git  |
+| zsh-syntax-highlighting | 语法高亮                      | sheldon / git  |
+| eza                     | 现代 `ls` 替代                | cargo          |
+| yazi                    | 终端文件管理器                | cargo          |
+| Rust (rustup)           | Rust 开发环境                 | rustup         |
+| Volta                   | Node/npm/pnpm 版本管理        | volta          |
+| uv                      | Python 版本管理               | uv             |
+| proto                   | 多语言版本管理                | proto          |
 
 ## 安装后
 

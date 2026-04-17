@@ -36,7 +36,8 @@ wsl2-ubuntu-one-click/
 步骤 1: 选择并安装 WSL2 分发版（Ubuntu-24.04/22.04/20.04/Debian）
 步骤 2: 配置 .wslconfig（网络模式、DNS、内存回收等，合并已有配置）
 步骤 3: 创建 Linux 用户（含 sudo 免密、wsl.conf 默认用户配置）
-步骤 4: 选择终端主题（Powerlevel10k 或 Pure）
+步骤 4a: 选择插件管理器（Sheldon 或 Oh My Zsh，默认 Sheldon）
+步骤 4b: 选择终端主题（Powerlevel10k 或 Pure）
 步骤 5: 安装 MesloLGS Nerd Font 字体并配置 Windows Terminal
 步骤 6: 选择要安装的开发工具组件
 步骤 7: 将 setup-dev-env.sh 复制到子系统内并执行
@@ -60,17 +61,30 @@ wsl2-ubuntu-one-click/
 
 **组件依赖链**：
 ```
-基础组件（始终安装）: apt-deps → zsh → ohmyzsh → theme
+基础组件（始终安装）: apt-deps → zsh → plugin-mgr (sheldon/ohmyzsh) → theme
 可选组件: rustup → { eza, yazi }（cargo 编译）
 独立可选: zsh-autosuggestions, zsh-syntax-highlighting, volta, uv, proto
 ```
 
 > 注意：选择 eza 或 yazi 时会自动添加 rustup 依赖。
 
+**插件管理器架构**：
+- `SELECTED_PLUGIN_MGR` 变量控制当前模式（`sheldon` 或 `ohmyzsh`）
+- 自动检测：已安装 Oh My Zsh 且未安装 Sheldon → 默认 ohmyzsh；否则 → 默认 sheldon
+- CLI 参数：`--plugin-mgr sheldon|ohmyzsh`
+- `install_plugin_mgr()` / `uninstall_plugin_mgr()` 为 dispatch 函数，委派到对应实现
+
+**Sheldon 模式特殊逻辑**：
+- 插件（zsh-autosuggestions, zsh-syntax-highlighting）和主题（p10k, pure）的 install 函数在 Sheldon 模式下为空操作
+- `configure_sheldon_plugins()` 生成 `~/.config/sheldon/plugins.toml`，并执行 `sheldon lock --update` 下载所有插件
+- `.zshrc` 使用 `eval "$(sheldon source)"` 代替 `source $ZSH/oh-my-zsh.sh`
+- eza aliases 通过 inline plugin 在 `plugins.toml` 中定义
+
 **`.zshrc` 配置管理**：
 - 使用 `# >>> one-click-dev-env >>>` / `# <<< one-click-dev-env <<<` 标记块管理自动生成的配置
 - 标记块外的用户自定义配置不会被覆盖
-- eza 的 `zstyle` 配置插入在 `source oh-my-zsh.sh` **之前**（这是 oh-my-zsh 插件系统的要求）
+- Oh My Zsh 模式：eza 的 `zstyle` 配置插入在 `source oh-my-zsh.sh` **之前**（这是 oh-my-zsh 插件系统的要求）
+- Sheldon 模式：无需 oh-my-zsh 相关配置，所有插件通过 `plugins.toml` 管理
 - 每次配置前自动备份 `.zshrc`，仅保留最近 3 个备份
 
 ## 开发规范
