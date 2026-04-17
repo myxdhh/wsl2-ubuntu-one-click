@@ -121,6 +121,37 @@ ZSH_CUSTOM_DIR="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
 
 command_exists() { command -v "$1" &>/dev/null; }
 
+# 生成 CLI 工具的 Zsh 补全文件
+generate_completions() {
+    local comp_dir
+    if [[ "$SELECTED_PLUGIN_MGR" == "ohmyzsh" ]] && [[ -d "$HOME/.oh-my-zsh" ]]; then
+        comp_dir="$HOME/.oh-my-zsh/completions"
+    else
+        comp_dir="$HOME/.zsh/completions"
+    fi
+    mkdir -p "$comp_dir"
+
+    # rustup + cargo
+    if command_exists rustup; then
+        rustup completions zsh > "$comp_dir/_rustup" 2>/dev/null
+        rustup completions zsh cargo > "$comp_dir/_cargo" 2>/dev/null
+    fi
+    # volta
+    if command_exists volta; then
+        volta completions zsh > "$comp_dir/_volta" 2>/dev/null
+    fi
+    # uv
+    if command_exists uv; then
+        uv generate-shell-completion zsh > "$comp_dir/_uv" 2>/dev/null
+    fi
+    # proto
+    if command_exists proto; then
+        proto completions --shell zsh > "$comp_dir/_proto" 2>/dev/null
+    fi
+
+    info "补全文件已生成到: $comp_dir"
+}
+
 check_os() {
     if [[ -f /etc/os-release ]]; then
         . /etc/os-release
@@ -773,6 +804,10 @@ THEME_P10K
 
     # 补全定义（必须在 compinit 之前）
     cat >> "$plugins_toml" << 'COMPLETIONS_BLOCK'
+[plugins.custom-completions]
+local = "~/.zsh/completions"
+apply = ["fpath"]
+
 [plugins.zsh-completions]
 github = "zsh-users/zsh-completions"
 dir = "src"
@@ -1470,6 +1505,9 @@ run_install_all() {
     should_install "uv" && install_uv
     should_install "proto" && install_proto
     
+    # 生成 CLI 工具的补全文件（必须在 configure_zshrc 之前）
+    generate_completions
+
     # 配置
     configure_zshrc
 

@@ -142,6 +142,26 @@ p10k configure
   `iex (iwr -useb https://raw.githubusercontent.com/romkatv/powerlevel10k-media/master/fonts.ps1)`
 - **macOS（推荐使用 Homebrew）**：
   `brew tap homebrew/cask-fonts && brew install --cask font-meslo-lg-nerd-font`
+## 添加命令补全
+
+脚本已自动为 `rustup`、`cargo`、`volta`、`uv`、`proto` 生成 Zsh 补全文件。如需为其他工具添加补全：
+
+**Sheldon 模式**（补全文件目录：`~/.zsh/completions`）：
+
+```bash
+# 文件名必须以 _ 开头
+your-cli completions zsh > ~/.zsh/completions/_your-cli
+# 重建补全缓存
+exec zsh
+```
+
+**Oh My Zsh 模式**（补全文件目录：`~/.oh-my-zsh/completions`）：
+
+```bash
+mkdir -p ~/.oh-my-zsh/completions
+your-cli completions zsh > ~/.oh-my-zsh/completions/_your-cli
+omz reload
+```
 
 ## 注意事项
 
