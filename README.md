@@ -90,8 +90,8 @@ bash setup-dev-env.sh --install
 # 使用 Oh My Zsh 插件管理器并指定主题
 bash setup-dev-env.sh --install --plugin-mgr ohmyzsh --theme pure
 
-# 指定主题并仅安装部分组件
-bash setup-dev-env.sh --install --theme pure --components "rustup,volta,uv"
+# 仅安装部分组件
+bash setup-dev-env.sh --install --components rustup volta uv
 
 # 一键卸载所有组件
 bash setup-dev-env.sh --uninstall
@@ -99,6 +99,8 @@ bash setup-dev-env.sh --uninstall
 # 交互模式（选择安装/卸载）
 bash setup-dev-env.sh
 ```
+
+`--components` 可选值：`rustup`, `eza`, `yazi`, `volta`, `uv`, `proto`
 
 ## 安装的组件
 

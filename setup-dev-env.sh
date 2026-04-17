@@ -96,12 +96,12 @@ COMPONENTS=(
     "apt-deps:基础依赖包"
     "zsh:Zsh Shell"
     "plugin-mgr:插件管理器 (Sheldon/Oh My Zsh)"
-    "rustup:Rust 工具链 (rustup)"
-    "eza:eza (现代 ls 替代)"
-    "yazi:yazi (终端文件管理器)"
     "theme:终端主题 (p10k/pure)"
     "zsh-autosuggestions:zsh-autosuggestions 插件"
     "zsh-syntax-highlighting:zsh-syntax-highlighting 插件"
+    "rustup:Rust 工具链 (rustup)"
+    "eza:eza (现代 ls 替代)"
+    "yazi:yazi (终端文件管理器)"
     "volta:Volta (Node/npm/pnpm 版本管理)"
     "uv:uv (Python 版本管理)"
     "proto:proto (多语言版本管理)"
@@ -1135,13 +1135,13 @@ run_install_all() {
     install_zsh
     install_plugin_mgr
     install_theme
+    install_zsh_autosuggestions
+    install_zsh_syntax_highlighting
 
     # 可选组件
     should_install "rustup" && install_rustup
     should_install "eza" && install_eza
     should_install "yazi" && install_yazi
-    should_install "zsh-autosuggestions" && install_zsh_autosuggestions
-    should_install "zsh-syntax-highlighting" && install_zsh_syntax_highlighting
     should_install "volta" && install_volta
     should_install "uv" && install_uv
     should_install "proto" && install_proto
@@ -1167,9 +1167,10 @@ run_install_all() {
         echo "  • Powerlevel10k 主题"
     fi
 
+    echo "  • zsh-autosuggestions"
+    echo "  • zsh-syntax-highlighting"
+
     echo -e "\n${BOLD}可选组件配置结果：${NC}"
-    should_install "zsh-autosuggestions" && echo "  • zsh-autosuggestions"
-    should_install "zsh-syntax-highlighting" && echo "  • zsh-syntax-highlighting"
     should_install "rustup" && echo "  • Rust (rustup + cargo)"
     should_install "eza" && echo "  • eza"
     should_install "yazi" && echo "  • yazi"
@@ -1291,43 +1292,157 @@ interactive_menu() {
         action_label="卸载"
     fi
 
-    echo -e "\n${BOLD}请选择要${action_label}的组件（输入编号，逗号分隔，或 ${CYAN}all${NC}${BOLD} 全选）：${NC}"
-    echo -e "  ${GREEN}●${NC} = 已安装    ${RED}○${NC} = 未安装\n"
+    # 基础组件 ID（安装时锁定必选，卸载时从列表排除）
+    local -a protected_ids=("apt-deps" "zsh" "plugin-mgr" "theme" "zsh-autosuggestions" "zsh-syntax-highlighting")
 
+    _is_protected() {
+        local id="$1"
+        for pid in "${protected_ids[@]}"; do
+            [[ "$id" == "$pid" ]] && return 0
+        done
+        return 1
+    }
+
+    local -a names=()
+    local -a descs=()
+    local -a statuses=()
+    local -a checked=()
+    local -a locked=()    # "true" = 不可切换
+
+    # 初始化选项
     for i in "${!COMPONENTS[@]}"; do
         local comp="${COMPONENTS[$i]}"
-        local name="${comp%%:*}"
-        local desc="${comp##*:}"
-        local status
-        status=$(show_status_indicator "$name")
-        printf "  %b ${CYAN}%2d${NC}) %-40s ${BOLD}[%s]${NC}\n" "$status" "$((i+1))" "$desc" "$name"
+        local id="${comp%%:*}"
+
+        # 卸载模式：排除基础组件
+        if [[ "$action" == "uninstall" ]] && _is_protected "$id"; then
+            continue
+        fi
+
+        names+=("$id")
+        descs+=("${comp##*:}")
+        statuses+=("$(show_status_indicator "$id")")
+
+        if [[ "$action" == "install" ]] && _is_protected "$id"; then
+            # 安装模式：基础组件默认选中且锁定
+            checked+=("true")
+            locked+=("true")
+        else
+            # 其他组件默认不选
+            checked+=("false")
+            locked+=("false")
+        fi
     done
 
-    echo ""
-    read -rp "请输入选择 (例: 1,3,5 或 all): " choices
+    local total=${#names[@]}
+    local cursor=0
 
-    if [[ -z "$choices" ]]; then
-        warn "未输入任何选择"
+    if [[ $total -eq 0 ]]; then
+        warn "没有可${action_label}的组件"
         return
     fi
 
-    local selected=()
-    if [[ "$choices" == "all" ]]; then
-        for comp in "${COMPONENTS[@]}"; do
-            selected+=("${comp%%:*}")
-        done
-    else
-        IFS=',' read -ra nums <<< "$choices"
-        for num in "${nums[@]}"; do
-            num=$(echo "$num" | tr -d '[:space:]')
-            if [[ "$num" =~ ^[0-9]+$ ]] && (( num >= 1 && num <= ${#COMPONENTS[@]} )); then
-                local comp="${COMPONENTS[$((num-1))]}"
-                selected+=("${comp%%:*}")
+    # 绘制菜单
+    _draw_menu() {
+        for i in "${!descs[@]}"; do
+            local pointer="  "
+            [[ $i -eq $cursor ]] && pointer="${CYAN}▸${NC} "
+
+            local checkbox
+            if [[ "${locked[$i]}" == "true" ]]; then
+                # 锁定项：始终选中，灰色显示
+                checkbox="${GREEN}[✔]${NC} 🔒"
+            elif [[ "${checked[$i]}" == "true" ]]; then
+                checkbox="${GREEN}[✔]${NC}   "
             else
-                warn "无效选择: $num，已跳过"
+                checkbox="[ ]   "
             fi
+
+            printf "\r  %b%b %-36s %b ${BOLD}[%s]${NC}\n" \
+                "$pointer" "$checkbox" "${descs[$i]}" "${statuses[$i]}" "${names[$i]}"
         done
+        # 操作提示
+        echo -e "  ${BOLD}────────────────────────────────────────────────────────${NC}"
+        echo -e "  ${CYAN}↑/↓${NC} 移动  ${CYAN}空格${NC} 选中/取消  ${CYAN}a${NC} 全选  ${CYAN}n${NC} 全不选  ${CYAN}回车${NC} 确认  ${CYAN}q${NC} 取消"
+    }
+
+    echo -e "\n${BOLD}请选择要${action_label}的组件：${NC}"
+    echo -e "  ${GREEN}●${NC} = 已安装    ${RED}○${NC} = 未安装"
+    if [[ "$action" == "uninstall" ]]; then
+        echo -e "  ${YELLOW}提示：基础组件（apt-deps, zsh, 插件管理器）仅可通过一键卸载移除${NC}"
     fi
+    echo ""
+
+    # 隐藏光标
+    tput civis 2>/dev/null
+
+    # 首次绘制
+    _draw_menu
+
+    # 交互循环
+    while true; do
+        local key
+        IFS= read -rsn1 key
+
+        case "$key" in
+            $'\x1b')
+                # 读取方向键序列
+                read -rsn2 -t 0.1 key
+                case "$key" in
+                    '[A') (( cursor > 0 )) && (( cursor-- )) ;;
+                    '[B') (( cursor < total - 1 )) && (( cursor++ )) ;;
+                esac
+                ;;
+            ' ')
+                # 空格：切换选中状态（跳过锁定项）
+                if [[ "${locked[$cursor]}" != "true" ]]; then
+                    if [[ "${checked[$cursor]}" == "true" ]]; then
+                        checked[$cursor]="false"
+                    else
+                        checked[$cursor]="true"
+                    fi
+                fi
+                ;;
+            '')
+                # 回车：确认选择
+                break
+                ;;
+            'a'|'A')
+                # 全选（跳过锁定项，它们已经是 true）
+                for i in "${!checked[@]}"; do
+                    [[ "${locked[$i]}" != "true" ]] && checked[$i]="true"
+                done
+                ;;
+            'n'|'N')
+                # 全不选（跳过锁定项）
+                for i in "${!checked[@]}"; do
+                    [[ "${locked[$i]}" != "true" ]] && checked[$i]="false"
+                done
+                ;;
+            'q'|'Q')
+                # 退出
+                tput cnorm 2>/dev/null
+                info "已取消"
+                return
+                ;;
+        esac
+
+        # 光标回到菜单顶部重绘（菜单行数 = total + 2 行提示）
+        printf "\033[%dA\r" "$((total + 2))"
+        _draw_menu
+    done
+
+    # 恢复光标
+    tput cnorm 2>/dev/null
+    echo ""
+
+    # 收集选中项
+    local selected=()
+    for i in "${!checked[@]}"; do
+        if [[ "${checked[$i]}" == "true" ]]; then
+            selected+=("${names[$i]}")
+        fi
+    done
 
     if [[ ${#selected[@]} -eq 0 ]]; then
         warn "未选择任何组件"
@@ -1439,8 +1554,17 @@ main() {
                 ;;
             --components)
                 shift
-                SELECTED_COMPONENTS="${1:-}"
-                shift
+                # 支持空格分隔和逗号分隔: --components rustup eza volta 或 --components rustup,eza,volta
+                local _comps=""
+                while [[ $# -gt 0 && ! "$1" =~ ^-- ]]; do
+                    if [[ -n "$_comps" ]]; then
+                        _comps="${_comps},${1}"
+                    else
+                        _comps="$1"
+                    fi
+                    shift
+                done
+                SELECTED_COMPONENTS="$_comps"
                 ;;
             --auto-cleanup)
                 AUTO_CLEANUP=1
@@ -1449,7 +1573,7 @@ main() {
             --help|-h)
                 echo "Linux 开发环境管理工具"
                 echo ""
-                echo "用法: $0 [--install | --uninstall] [--plugin-mgr sheldon|ohmyzsh] [--theme p10k|pure] [--components \"comp1,comp2\"] [--help]"
+                echo "用法: $0 [--install | --uninstall] [--plugin-mgr sheldon|ohmyzsh] [--theme p10k|pure] [--components comp1 ...] [--help]"
                 echo ""
                 echo "选项:"
                 echo "  --install              一键安装所有组件"
@@ -1461,7 +1585,10 @@ main() {
                 echo "  --theme p10k|pure      指定终端主题（默认: p10k）"
                 echo "    p10k   Powerlevel10k  高度可定制、丰富图标（需 Nerd Font）"
                 echo "    pure   Pure           极简美观、无需特殊字体"
-                echo "  --components \"...\"   指定要安装的可选组件标识符，逗号分隔 (例: rustup,eza,volta)，留空或不传则安装全部"
+                echo "  --components comp1 [comp2 ...]"
+                echo "                         指定要安装的可选组件，不传则安装全部"
+                echo "                         例: --components rustup eza volta"
+                echo "                         可选值: rustup, eza, yazi, volta, uv, proto"
                 echo "  --help, -h             显示帮助信息"
                 echo "  （无参数）              进入交互界面"
                 echo ""
@@ -1470,7 +1597,7 @@ main() {
                 ;;
             *)
                 error "未知选项: $1"
-                echo "用法: $0 [--install | --uninstall] [--plugin-mgr sheldon|ohmyzsh] [--theme p10k|pure] [--help]"
+                echo "用法: $0 [--install | --uninstall] [--plugin-mgr sheldon|ohmyzsh] [--theme p10k|pure] [--components comp1 ...] [--help]"
                 exit 1
                 ;;
         esac

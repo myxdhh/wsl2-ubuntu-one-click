@@ -809,17 +809,15 @@ function Step-SelectComponents {
         @{ Id = "rustup"; Name = "Rust 工具链 (rustup)" }
         @{ Id = "eza"; Name = "eza (现代 ls 替代)" }
         @{ Id = "yazi"; Name = "yazi (终端文件管理器)" }
-        @{ Id = "zsh-autosuggestions"; Name = "zsh-autosuggestions 插件" }
-        @{ Id = "zsh-syntax-highlighting"; Name = "zsh-syntax-highlighting 插件" }
         @{ Id = "volta"; Name = "Volta (Node.js/npm/pnpm 版本管理)" }
         @{ Id = "uv"; Name = "uv (Python 环境管理)" }
         @{ Id = "proto"; Name = "proto (多语言版本管理)" }
     )
 
     if ($pluginMgr -eq "sheldon") {
-        Write-Host "  基础组件 (始终安装): Zsh, Sheldon, 终端主题" -ForegroundColor DarkGray
+        Write-Host "  基础组件 (始终安装): Zsh, Sheldon, 主题, zsh-autosuggestions, zsh-syntax-highlighting" -ForegroundColor DarkGray
     } else {
-        Write-Host "  基础组件 (始终安装): Zsh, Oh My Zsh, 终端主题" -ForegroundColor DarkGray
+        Write-Host "  基础组件 (始终安装): Zsh, Oh My Zsh, 主题, zsh-autosuggestions, zsh-syntax-highlighting" -ForegroundColor DarkGray
     }
     Write-Host ""
     Write-Host "  可选开发工具：" -ForegroundColor Cyan
