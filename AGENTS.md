@@ -65,7 +65,7 @@ wsl2-ubuntu-one-click/
 ```
 基础组件（始终安装）: apt-deps → zsh → plugin-mgr (sheldon/ohmyzsh) → theme → zsh-autosuggestions → fast-syntax-highlighting
 可选组件: rustup → { eza, yazi }（cargo 编译）
-独立可选: volta, uv, proto
+独立可选: fzf, zoxide, volta, uv, proto
 ```
 
 > 注意：选择 eza 或 yazi 时会自动添加 rustup 依赖。

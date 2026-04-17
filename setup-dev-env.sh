@@ -103,6 +103,8 @@ COMPONENTS=(
     "theme:终端主题 (starship/p10k/pure)"
     "zsh-autosuggestions:zsh-autosuggestions 插件"
     "fast-syntax-highlighting:fast-syntax-highlighting 插件"
+    "fzf:fzf (模糊搜索)"
+    "zoxide:zoxide (智能 cd)"
     "rustup:Rust 工具链 (rustup)"
     "eza:eza (现代 ls 替代)"
     "yazi:yazi (终端文件管理器)"
@@ -534,6 +536,49 @@ install_fast_syntax_highlighting() {
     log_end "fast-syntax-highlighting" $?
 }
 
+install_fzf() {
+    header "安装 fzf (模糊搜索)"
+    log_start "fzf"
+
+    if command_exists fzf; then
+        success "fzf 已安装: $(fzf --version 2>&1 | head -1)"
+    else
+        if [[ -d "$HOME/.fzf" ]]; then
+            info "~/.fzf 目录已存在，尝试重新安装..."
+            rm -rf "$HOME/.fzf"
+        fi
+        if ! git clone --depth 1 https://github.com/junegunn/fzf.git "$HOME/.fzf" 2>&1 | tee -a "$LOG_FILE"; then
+            record_failure "fzf"
+            return 1
+        fi
+        # --key-bindings --completion: 启用快捷键和补全  --no-update-rc: 我们自己管理 .zshrc
+        if ! "$HOME/.fzf/install" --key-bindings --completion --no-update-rc --no-bash --no-fish 2>&1 | tee -a "$LOG_FILE"; then
+            record_failure "fzf"
+            return 1
+        fi
+        success "fzf 安装完成"
+    fi
+
+    log_end "fzf" $?
+}
+
+install_zoxide() {
+    header "安装 zoxide (智能 cd)"
+    log_start "zoxide"
+
+    if command_exists zoxide; then
+        success "zoxide 已安装: $(zoxide --version 2>&1)"
+    else
+        if ! curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh 2>&1 | tee -a "$LOG_FILE"; then
+            record_failure "zoxide"
+            return 1
+        fi
+        success "zoxide 安装完成"
+    fi
+
+    log_end "zoxide" $?
+}
+
 install_volta() {
     header "安装 Volta (Node/npm/pnpm)"
     log_start "volta"
@@ -703,6 +748,19 @@ fi
 '''
 
 EZA_PLUGIN
+
+    # fzf integration
+    cat >> "$plugins_toml" << 'FZF_PLUGIN'
+[plugins.fzf]
+inline = '''
+if [[ -f "$HOME/.fzf.zsh" ]]; then
+  source "$HOME/.fzf.zsh"
+elif (( $+commands[fzf] )); then
+  source <(fzf --zsh 2>/dev/null)
+fi
+'''
+
+FZF_PLUGIN
 
     # zoxide integration
     cat >> "$plugins_toml" << 'ZOXIDE_PLUGIN'
@@ -930,6 +988,12 @@ export VOLTA_FEATURE_PNPM=1
 export PROTO_HOME="$HOME/.proto"
 export PATH="$PROTO_HOME/shims:$PROTO_HOME/bin:$PATH"
 
+# ── fzf ──
+[[ -f "$HOME/.fzf.zsh" ]] && source "$HOME/.fzf.zsh"
+
+# ── zoxide ──
+(( $+commands[zoxide] )) && eval "$(zoxide init zsh)"
+
 # <<< one-click-dev-env <<<
 ENV_BLOCK
         } >> "$zshrc"
@@ -947,6 +1011,31 @@ uninstall_proto() {
         success "proto 已卸载"
     else
         info "proto 未安装，跳过"
+    fi
+}
+
+uninstall_fzf() {
+    header "卸载 fzf"
+    if [[ -d "$HOME/.fzf" ]]; then
+        rm -rf "$HOME/.fzf"
+        rm -f "$HOME/.fzf.zsh" "$HOME/.fzf.bash"
+        success "fzf 已卸载"
+    elif command_exists fzf; then
+        rm -f "$(which fzf)" 2>/dev/null || true
+        success "fzf 已卸载"
+    else
+        info "fzf 未安装，跳过"
+    fi
+}
+
+uninstall_zoxide() {
+    header "卸载 zoxide"
+    if command_exists zoxide || [[ -f "$HOME/.local/bin/zoxide" ]]; then
+        rm -f "$HOME/.local/bin/zoxide"
+        rm -rf "$HOME/.local/share/zoxide"
+        success "zoxide 已卸载"
+    else
+        info "zoxide 未安装，跳过"
     fi
 }
 
@@ -1253,6 +1342,8 @@ run_install_all() {
     install_fast_syntax_highlighting
 
     # 可选组件
+    should_install "fzf" && install_fzf
+    should_install "zoxide" && install_zoxide
     should_install "rustup" && install_rustup
     should_install "eza" && install_eza
     should_install "yazi" && install_yazi
@@ -1285,6 +1376,8 @@ run_install_all() {
     echo "  • fast-syntax-highlighting"
 
     echo -e "\n${BOLD}可选组件配置结果：${NC}"
+    should_install "fzf" && echo "  • fzf (模糊搜索)"
+    should_install "zoxide" && echo "  • zoxide (智能 cd)"
     should_install "rustup" && echo "  • Rust (rustup + cargo)"
     should_install "eza" && echo "  • eza"
     should_install "yazi" && echo "  • yazi"
@@ -1346,6 +1439,8 @@ run_uninstall_all() {
     uninstall_volta
     uninstall_yazi
     uninstall_eza
+    uninstall_zoxide
+    uninstall_fzf
     uninstall_fast_syntax_highlighting
     uninstall_zsh_autosuggestions
     uninstall_theme
@@ -1401,6 +1496,8 @@ show_status_indicator() {
                 echo -e "${RED}○${NC}"
             fi
             ;;
+        fzf)          command_exists fzf && echo -e "${GREEN}●${NC}" || echo -e "${RED}○${NC}" ;;
+        zoxide)       command_exists zoxide && echo -e "${GREEN}●${NC}" || echo -e "${RED}○${NC}" ;;
         volta)        command_exists volta && echo -e "${GREEN}●${NC}" || echo -e "${RED}○${NC}" ;;
         uv)           command_exists uv && echo -e "${GREEN}●${NC}" || echo -e "${RED}○${NC}" ;;
         proto)        command_exists proto && echo -e "${GREEN}●${NC}" || echo -e "${RED}○${NC}" ;;
@@ -1716,7 +1813,7 @@ main() {
                 echo "  --components comp1 [comp2 ...]"
                 echo "                         指定要安装的可选组件，不传则安装全部"
                 echo "                         例: --components rustup eza volta"
-                echo "                         可选值: rustup, eza, yazi, volta, uv, proto"
+                echo "                         可选值: fzf, zoxide, rustup, eza, yazi, volta, uv, proto"
                 echo "  --help, -h             显示帮助信息"
                 echo "  （无参数）              进入交互界面"
                 echo ""

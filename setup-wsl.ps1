@@ -808,6 +808,8 @@ function Step-SelectComponents {
     Write-Header "步骤 6: 选择要安装的开发工具"
 
     $components = @(
+        @{ Id = "fzf"; Name = "fzf (模糊搜索)" }
+        @{ Id = "zoxide"; Name = "zoxide (智能 cd)" }
         @{ Id = "rustup"; Name = "Rust 工具链 (rustup)" }
         @{ Id = "eza"; Name = "eza (现代 ls 替代)" }
         @{ Id = "yazi"; Name = "yazi (终端文件管理器)" }

@@ -18,7 +18,7 @@ docker desktop 基本上都安装过了，就不写到脚本了。
 - 插件管理 [Sheldon](https://github.com/rossmacarthur/sheldon)（默认）或 Oh My Zsh（可选）
 - 终端 zsh + [Starship](https://starship.rs/)（默认）/ powerlevel10k / pure + zsh-autosuggestions + fast-syntax-highlighting
 - 字体 MesloLGS NF
-- 工具 Rust, Volta（包含 node、npm、pnpm 的 latest 版本）, uv（python 的 3.14 版本）, proto, eza, yazi
+- 工具 fzf, zoxide, Rust, Volta（包含 node、npm、pnpm 的 latest 版本）, uv（python 的 3.14 版本）, proto, eza, yazi
 
 ## 文件说明
 
@@ -100,7 +100,7 @@ bash setup-dev-env.sh --uninstall
 bash setup-dev-env.sh
 ```
 
-`--components` 可选值：`rustup`, `eza`, `yazi`, `volta`, `uv`, `proto`
+`--components` 可选值：`fzf`, `zoxide`, `rustup`, `eza`, `yazi`, `volta`, `uv`, `proto`
 
 ## 安装的组件
 
@@ -114,6 +114,8 @@ bash setup-dev-env.sh
 | Pure                    | 终端主题 (极简，无需特殊字体) | sheldon / git  |
 | zsh-autosuggestions     | 命令补全建议                  | sheldon / git  |
 | fast-syntax-highlighting | 语法高亮（极速，Chroma 引擎）    | sheldon / git  |
+| fzf                      | 模糊搜索                      | git clone      |
+| zoxide                   | 智能 cd                       | install script |
 | eza                     | 现代 `ls` 替代                | cargo          |
 | yazi                    | 终端文件管理器                | cargo          |
 | Rust (rustup)           | Rust 开发环境                 | rustup         |
