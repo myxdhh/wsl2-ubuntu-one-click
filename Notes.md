@@ -82,6 +82,55 @@ if ($LASTEXITCODE -ne 0) {
 }
 ```
 
+### 实际案例：Step-CreateUser 管道污染导致 WSL_E_USER_NOT_FOUND
+
+**错误现象：**
+
+```
+[INFO] 正在子系统内以 uid=1000(trdx) gid=1000(trdx) groups=1000(trdx),27(sudo) trdx : trdx sudo trdx 身份执行开发环境安装...
+<3>WSL (315 - Relay) ERROR: CreateProcessParseCommon:988: getpwnam("uid=1000(trdx)) failed 0
+User not found.
+Error code: Wsl/WSL_E_USER_NOT_FOUND
+```
+
+步骤 7 的日志显示 `$Username` 变量值为 `uid=1000(trdx) gid=1000(trdx) groups=1000(trdx),27(sudo) trdx : trdx sudo trdx`，而不是预期的 `trdx`。WSL 用这个完整字符串去执行 `getpwnam()` 查找用户，自然找不到。
+
+**根因分析：**
+
+`Main` 函数中通过 `$username = Step-CreateUser -InstanceName $instanceName` 捕获返回值。`Step-CreateUser` 内部的 `wsl` 调用（`id`、`useradd`、`chpasswd`、`usermod`、`groups`、`wsl.conf` 配置）没有加 `| Out-Host` 或 `| Out-Null`，其 stdout 输出全部进入了函数的输出管道，与 `return $username` 的值拼接成了一个数组/字符串。
+
+特别是验证命令 `wsl -- bash -c "id '$username' && groups '$username'"` 输出了 `uid=1000(trdx) gid=1000(trdx)...` 这样的内容，混入了 `$username`。
+
+**引入时间线：**
+
+| Commit | 变化 | 结果 |
+|--------|------|------|
+| `3438076` (feat: init) | 所有 `wsl` 调用有 `\| Out-Host` | ✅ 正常 |
+| `1d79423` (refactor: ...) | 重构时移除了大部分 `\| Out-Host` | ❌ 引入 bug |
+| `55bb749` ~ `d867afe` | 后续修改未关注管道问题 | ❌ bug 延续 |
+
+**为什么之前"看起来正常"：**
+
+如果之前的测试没有完整走到步骤 7（`Step-RunDevEnvScript`），或者是分步手动执行的，`$username` 被污染的问题就不会暴露。只有当后续代码实际使用 `wsl -u $Username` 时，被污染的用户名才会触发 `WSL_E_USER_NOT_FOUND`。
+
+**修复：**
+
+```diff
+- wsl -d $InstanceName -u root -- bash -c "id '$username' >/dev/null 2>&1 || useradd ..."
++ wsl -d $InstanceName -u root -- bash -c "id '$username' >/dev/null 2>&1 || useradd ..." | Out-Null
+
+- wsl -d $InstanceName -u root -- bash -c "id '$username' && groups '$username'"
++ wsl -d $InstanceName -u root -- bash -c "id '$username' && groups '$username'" | Out-Host
+
+- wsl -d $InstanceName -u root -- bash -c $wslConfScript
++ wsl -d $InstanceName -u root -- bash -c $wslConfScript | Out-Null
+```
+
+- 内部操作命令（useradd, chpasswd, usermod, wsl.conf）：`| Out-Null`，丢弃输出
+- 用户可见的验证命令（id, groups）：`| Out-Host`，输出到控制台但不进入管道
+
+**教训：对所有 `$var = SomeFunction` 捕获返回值的函数，内部每一条会产生 stdout 的语句都必须显式处理输出。**
+
 ## chpasswd 跨 OS 管道失败问题
 
 ### 问题现象
