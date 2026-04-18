@@ -743,11 +743,10 @@ function Step-CreateUser {
         }
 
         # 通过 PowerShell 管道传入密码（密码不出现在命令行参数中）。
-        # 注意：PowerShell 管道使用 CRLF 行尾，而 chpasswd 不会剥离 \r，
-        # 导致 \r 被当作密码的一部分，触发 pam_chauthtok() 失败。
-        # 解决方案：通过 bash read 读取 stdin（read 会自动剥离尾部 \r\n），
-        # 再用 printf 以纯 LF 重新传给 chpasswd。
-        "${username}:${pwdPlain}" | wsl -d $InstanceName -u root -- bash -c 'read line && printf "%s\n" "$line" | chpasswd'
+        # 注意：PowerShell 管道使用 CRLF 行尾，而 Linux chpasswd 期望 LF，
+        # 多余的 \r 会导致 pam_chauthtok() 失败。
+        # 使用 tr -d '\r' 剥离 \r 后再传给 chpasswd。
+        "${username}:${pwdPlain}" | wsl -d $InstanceName -u root -- bash -c 'tr -d "\r" | chpasswd'
         if ($LASTEXITCODE -ne 0) { throw "chpasswd 失败" }
 
         # 添加到 sudo 组
