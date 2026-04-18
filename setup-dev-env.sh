@@ -816,9 +816,17 @@ apply = ["fpath"]
 COMPLETIONS_BLOCK
 
     # compinit（初始化补全系统，必须在 fzf-tab 之前）
+    # 按日期判断缓存：当天使用 -C 快速加载，否则全量重建
     cat >> "$plugins_toml" << 'COMPINIT_BLOCK'
 [plugins.compinit]
-inline = 'autoload -Uz compinit && compinit -C'
+inline = '''
+autoload -Uz compinit
+if [[ -f "$HOME/.zcompdump" ]] && [[ $(date +'%j') == $(date -r "$HOME/.zcompdump" +'%j' 2>/dev/null) ]]; then
+  compinit -C
+else
+  compinit
+fi
+'''
 
 COMPINIT_BLOCK
 
@@ -1521,6 +1529,9 @@ run_install_all() {
     
     # 生成 CLI 工具的补全文件（必须在 configure_zshrc 之前）
     generate_completions
+
+    # 清除旧的 zcompdump 缓存，确保新补全文件在下次登录时被加载
+    rm -f "$HOME/.zcompdump"* 2>/dev/null
 
     # 配置
     configure_zshrc
