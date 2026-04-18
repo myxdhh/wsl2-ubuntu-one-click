@@ -170,6 +170,7 @@ omz reload
 - 分发版使用 `--web-download` 模式下载，需要网络连接
 - **网络要求**：脚本在安装过程中不会自动配置任何国内镜像源（如 apt, npm, rustup 等），请确保您的网络环境能够顺畅访问外网（如 GitHub 等），否则可能导致下载极其缓慢或安装失败
 - eza 和 yazi 通过 cargo 编译安装，首次安装耗时较长
+- **TODO**: `Step-CreateUser` 中 `chpasswd` 的密码目前通过 `bash -c "echo '...' | chpasswd"` 传递，密码会短暂出现在进程参数列表中（`/proc/*/cmdline`）。尝试过 PowerShell stdin 管道方案，但因 WSL interop 层的编码/转义问题无法可靠工作，待后续改进
 
 ## 测试
 

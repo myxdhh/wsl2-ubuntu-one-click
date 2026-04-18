@@ -742,17 +742,10 @@ function Step-CreateUser {
             if ($LASTEXITCODE -ne 0) { throw "useradd 失败" }
         }
 
-        # 通过 PowerShell 管道传入密码（密码不出现在命令行参数中）。
-        # 将凭据写入临时文件后，由 chpasswd 从本地文件读取，
-        # 避免跨 OS 的 stdin 管道传递导致 chpasswd/PAM 异常。
-        "${username}:${pwdPlain}" | wsl -d $InstanceName -u root -- bash -c '
-            tmpf=$(mktemp) && chmod 600 "$tmpf"
-            tr -d "\r" > "$tmpf"
-            chpasswd < "$tmpf"
-            rc=$?
-            shred -u "$tmpf" 2>/dev/null || rm -f "$tmpf"
-            exit $rc
-        '
+        # TODO: 密码通过 bash -c 参数传递，会短暂出现在进程参数列表中。
+        # 尝试过 PowerShell 管道 stdin → chpasswd 的方案，但因 WSL interop
+        # 层的编码/转义问题无法可靠工作，暂回退为此方式。
+        wsl -d $InstanceName -u root -- bash -c "echo '${username}:${pwdPlain}' | chpasswd"
         if ($LASTEXITCODE -ne 0) { throw "chpasswd 失败" }
 
         # 添加到 sudo 组
