@@ -734,14 +734,6 @@ function Step-CreateUser {
     # 在 WSL 内创建用户
     Write-Info "在子系统 $InstanceName 中创建用户 $username..."
 
-    # 首次启动子系统以完成初始化（--no-launch 安装后 PAM 等子系统未就绪，
-    # 直接调用 chpasswd 会报 "pam_chauthtok() failed" 错误）
-    Write-Info "初始化子系统..."
-    wsl -d $InstanceName -u root -- bash -c "echo 'WSL init OK'" | Out-Host
-    if ($LASTEXITCODE -ne 0) {
-        Write-Warn "子系统初始化返回非零退出码，继续尝试..."
-    }
-
     try {
         wsl -d $InstanceName -u root -- bash -c "id '$username' >/dev/null 2>&1 || useradd -m -s /bin/bash '$username'"
         if ($LASTEXITCODE -ne 0) {
@@ -750,8 +742,12 @@ function Step-CreateUser {
             if ($LASTEXITCODE -ne 0) { throw "useradd 失败" }
         }
 
-        # 通过管道传入密码，避免密码中的特殊字符被 shell 解释
-        "${username}:${pwdPlain}" | wsl -d $InstanceName -u root -- chpasswd
+        # 通过 PowerShell 管道传入密码（密码不出现在命令行参数中）。
+        # 注意：PowerShell 管道使用 CRLF 行尾，而 chpasswd 不会剥离 \r，
+        # 导致 \r 被当作密码的一部分，触发 pam_chauthtok() 失败。
+        # 解决方案：通过 bash read 读取 stdin（read 会自动剥离尾部 \r\n），
+        # 再用 printf 以纯 LF 重新传给 chpasswd。
+        "${username}:${pwdPlain}" | wsl -d $InstanceName -u root -- bash -c 'read line && printf "%s\n" "$line" | chpasswd'
         if ($LASTEXITCODE -ne 0) { throw "chpasswd 失败" }
 
         # 添加到 sudo 组
