@@ -491,11 +491,14 @@ function Step-InstallDistro {
     $wslArgs = @("--install", "-d", $selectedDistro, "--location", $installLocation, "--name", $instanceName, "--version", "2", "--web-download", "--no-launch")
     Write-Info "命令: wsl $($wslArgs -join ' ')"
 
-    try {
-        & wsl @wslArgs | Out-Host
-    }
-    catch {
-        Write-Err "安装失败: $_"
+    # 注意：wsl.exe 等原生命令失败时不抛出 PowerShell 异常，try/catch 无法捕获。
+    # 必须通过 $LASTEXITCODE 显式检查退出码。
+    # 历史记录：此处曾使用 `& wsl @wslArgs | Out-Host` + try/catch 的错误模式，
+    #   导致安装失败时 catch 块不会执行、脚本静默继续。| Out-Host 仅影响输出流重定向，
+    #   与异常捕获无关。
+    & wsl @wslArgs | Out-Host
+    if ($LASTEXITCODE -ne 0) {
+        Write-Err "安装失败 (退出码: $LASTEXITCODE)"
         Write-Info "请检查网络连接或尝试使用代理"
         exit 1
     }
@@ -756,7 +759,7 @@ function Step-CreateUser {
         # 设置默认用户（通过 /etc/wsl.conf），合并而非覆盖已有配置
         $wslConfScript = @"
 if grep -q '^\[user\]' /etc/wsl.conf 2>/dev/null; then
-    if grep -q '^default=' /etc/wsl.conf; then
+    if sed -n '/^\[user\]/,/^\[/p' /etc/wsl.conf | grep -q '^default='; then
         sed -i '/^\[user\]/,/^\[/{s/^default=.*/default=$username/}' /etc/wsl.conf
     else
         sed -i '/^\[user\]/a default=$username' /etc/wsl.conf
@@ -782,12 +785,13 @@ fi
 
     # sudo 免密配置
     if (Confirm-Action "是否为 $username 配置 sudo 免密？" -DefaultYes) {
-        try {
-            wsl -d $InstanceName -u root -- bash -c "echo '$username ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/$username && chmod 0440 /etc/sudoers.d/$username" | Out-Host
-            Write-Ok "用户 $username 已配置 sudo 免密"
+        # 注意：原生命令错误处理必须用 $LASTEXITCODE，不能用 try/catch（同上方 wsl --install 的注释）
+        wsl -d $InstanceName -u root -- bash -c "echo '$username ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/$username && chmod 0440 /etc/sudoers.d/$username" | Out-Host
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warn "配置 sudoers 失败 (退出码: $LASTEXITCODE)（可稍后手动配置）"
         }
-        catch {
-            Write-Warn "配置 sudoers 失败: $_（可稍后手动配置）"
+        else {
+            Write-Ok "用户 $username 已配置 sudo 免密"
         }
     }
     else {
@@ -818,7 +822,7 @@ function Step-SelectComponents {
         @{ Id = "proto"; Name = "proto (多语言版本管理)" }
     )
 
-    if ($pluginMgr -eq "sheldon") {
+    if ($PluginMgr -eq "sheldon") {
         Write-Host "  基础组件 (始终安装): Zsh, Sheldon, 主题, zsh-autosuggestions, fast-syntax-highlighting" -ForegroundColor DarkGray
     } else {
         Write-Host "  基础组件 (始终安装): Zsh, Oh My Zsh, 主题, zsh-autosuggestions, fast-syntax-highlighting" -ForegroundColor DarkGray
@@ -988,8 +992,7 @@ function Main {
         Write-Host "  MesloLGS Nerd Font 字体安装" -ForegroundColor Cyan
         Write-Host "═══════════════════════════════════════════════" -ForegroundColor Cyan
         Write-Host ""
-        $theme = Step-SelectTheme
-        Step-InstallFont -Theme $theme
+        Step-InstallFont
 
         $elapsed = (Get-Date) - $startTime
         $elapsedStr = "{0:D2}:{1:D2}:{2:D2}" -f $elapsed.Hours, $elapsed.Minutes, $elapsed.Seconds
@@ -1033,7 +1036,7 @@ function Main {
     $theme = Step-SelectTheme
 
     # 步骤 5: 安装字体
-    Step-InstallFont -Theme $theme
+    Step-InstallFont
 
     # 步骤 6: 选择组件
     $components = Step-SelectComponents -PluginMgr $pluginMgr
