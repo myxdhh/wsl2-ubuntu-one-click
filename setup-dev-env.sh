@@ -945,6 +945,14 @@ configure_zshrc() {
             echo "# >>> one-click-dev-env >>>"
             echo ""
 
+            # ~/.local/bin 必须最先加入 PATH（sheldon、starship 都安装在此目录）
+            # 注意: zsh 登录 shell 不会 source ~/.profile，因此需要在此显式设置
+            cat << 'PATH_BLOCK'
+# ── PATH ──
+[[ -d "$HOME/.local/bin" ]] && export PATH="$HOME/.local/bin:$PATH"
+
+PATH_BLOCK
+
             if [[ "$SELECTED_THEME" == "p10k" ]]; then
                 cat << 'P10K_INSTANT'
 # ── Powerlevel10k Instant Prompt ──
@@ -995,8 +1003,7 @@ export VOLTA_FEATURE_PNPM=1
 # ── Cargo / Rust ──
 [[ -f "$HOME/.cargo/env" ]] && source "$HOME/.cargo/env"
 
-# ── uv ──
-[[ -d "$HOME/.local/bin" ]] && export PATH="$HOME/.local/bin:$PATH"
+# ── uv (~/.local/bin 已在文件开头统一添加) ──
 
 # ── proto ──
 export PROTO_HOME="$HOME/.proto"
@@ -1059,6 +1066,14 @@ OMZ_TPL
             echo "# >>> one-click-dev-env >>>"
             echo ""
 
+            # ~/.local/bin 必须最先加入 PATH（starship 安装在此目录）
+            # 注意: zsh 登录 shell 不会 source ~/.profile，因此需要在此显式设置
+            cat << 'PATH_BLOCK'
+# ── PATH ──
+[[ -d "$HOME/.local/bin" ]] && export PATH="$HOME/.local/bin:$PATH"
+
+PATH_BLOCK
+
             case "$SELECTED_THEME" in
                 pure)
                     cat << 'PURE_BLOCK'
@@ -1111,8 +1126,7 @@ export VOLTA_FEATURE_PNPM=1
 # ── Cargo / Rust ──
 [[ -f "$HOME/.cargo/env" ]] && source "$HOME/.cargo/env"
 
-# ── uv ──
-[[ -d "$HOME/.local/bin" ]] && export PATH="$HOME/.local/bin:$PATH"
+# ── uv (~/.local/bin 已在文件开头统一添加) ──
 
 # ── proto ──
 export PROTO_HOME="$HOME/.proto"
