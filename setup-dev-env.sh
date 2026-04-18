@@ -953,14 +953,6 @@ configure_zshrc() {
             echo "# >>> one-click-dev-env >>>"
             echo ""
 
-            # ~/.local/bin 必须最先加入 PATH（sheldon、starship 都安装在此目录）
-            # 注意: zsh 登录 shell 不会 source ~/.profile，因此需要在此显式设置
-            cat << 'PATH_BLOCK'
-# ── PATH ──
-[[ -d "$HOME/.local/bin" ]] && export PATH="$HOME/.local/bin:$PATH"
-
-PATH_BLOCK
-
             if [[ "$SELECTED_THEME" == "p10k" ]]; then
                 cat << 'P10K_INSTANT'
 # ── Powerlevel10k Instant Prompt ──
@@ -971,10 +963,37 @@ fi
 P10K_INSTANT
             fi
 
-            cat << 'SHELDON_BLOCK'
+            cat << 'ENV_BLOCK'
+# ── PATH ──
+# zsh 登录 shell 不会 source ~/.profile，需要在此显式设置
+[[ -d "$HOME/.local/bin" ]] && export PATH="$HOME/.local/bin:$PATH"
+
+# ── Volta ──
+export VOLTA_HOME="$HOME/.volta"
+export VOLTA_FEATURE_PNPM=1
+[[ -d "$VOLTA_HOME/bin" ]] && export PATH="$VOLTA_HOME/bin:$PATH"
+
+# ── Cargo / Rust ──
+[[ -f "$HOME/.cargo/env" ]] && source "$HOME/.cargo/env"
+
+# ── proto ──
+export PROTO_HOME="$HOME/.proto"
+export PATH="$PROTO_HOME/shims:$PROTO_HOME/bin:$PATH"
+
+# ── Zsh History ──
+HISTFILE="$HOME/.zsh_history"
+HISTSIZE=50000
+SAVEHIST=50000
+setopt HIST_IGNORE_DUPS
+setopt HIST_IGNORE_ALL_DUPS
+setopt HIST_FIND_NO_DUPS
+setopt HIST_REDUCE_BLANKS
+setopt SHARE_HISTORY
+setopt APPEND_HISTORY
+
 # ── Sheldon (Plugin Manager) ──
 eval "$(sheldon source)"
-SHELDON_BLOCK
+ENV_BLOCK
 
             if [[ "$SELECTED_THEME" == "p10k" ]]; then
                 echo ""
@@ -990,35 +1009,8 @@ eval "$(starship init zsh)"
 STARSHIP_INIT
             fi
 
-            cat << 'ENV_BLOCK'
-
-# ── Zsh History ──
-HISTFILE="$HOME/.zsh_history"
-HISTSIZE=50000
-SAVEHIST=50000
-setopt HIST_IGNORE_DUPS
-setopt HIST_IGNORE_ALL_DUPS
-setopt HIST_FIND_NO_DUPS
-setopt HIST_REDUCE_BLANKS
-setopt SHARE_HISTORY
-setopt APPEND_HISTORY
-
-# ── Volta ──
-export VOLTA_HOME="$HOME/.volta"
-export VOLTA_FEATURE_PNPM=1
-[[ -d "$VOLTA_HOME/bin" ]] && export PATH="$VOLTA_HOME/bin:$PATH"
-
-# ── Cargo / Rust ──
-[[ -f "$HOME/.cargo/env" ]] && source "$HOME/.cargo/env"
-
-# ── uv (~/.local/bin 已在文件开头统一添加) ──
-
-# ── proto ──
-export PROTO_HOME="$HOME/.proto"
-export PATH="$PROTO_HOME/shims:$PROTO_HOME/bin:$PATH"
-
-# <<< one-click-dev-env <<<
-ENV_BLOCK
+            echo ""
+            echo "# <<< one-click-dev-env <<<"
         } >> "$zshrc"
 
         success ".zshrc 配置完成 (插件管理器: Sheldon, 主题: $SELECTED_THEME)"
@@ -1074,16 +1066,44 @@ OMZ_TPL
             echo "# >>> one-click-dev-env >>>"
             echo ""
 
-            # ~/.local/bin 必须最先加入 PATH（starship 安装在此目录）
-            # 注意: zsh 登录 shell 不会 source ~/.profile，因此需要在此显式设置
-            cat << 'PATH_BLOCK'
+            cat << 'ENV_BLOCK'
 # ── PATH ──
+# zsh 登录 shell 不会 source ~/.profile，需要在此显式设置
 [[ -d "$HOME/.local/bin" ]] && export PATH="$HOME/.local/bin:$PATH"
 
-PATH_BLOCK
+# ── Volta ──
+export VOLTA_HOME="$HOME/.volta"
+export VOLTA_FEATURE_PNPM=1
+[[ -d "$VOLTA_HOME/bin" ]] && export PATH="$VOLTA_HOME/bin:$PATH"
+
+# ── Cargo / Rust ──
+[[ -f "$HOME/.cargo/env" ]] && source "$HOME/.cargo/env"
+
+# ── proto ──
+export PROTO_HOME="$HOME/.proto"
+export PATH="$PROTO_HOME/shims:$PROTO_HOME/bin:$PATH"
+
+# ── Zsh History ──
+HISTFILE="$HOME/.zsh_history"
+HISTSIZE=50000
+SAVEHIST=50000
+setopt HIST_IGNORE_DUPS
+setopt HIST_IGNORE_ALL_DUPS
+setopt HIST_FIND_NO_DUPS
+setopt HIST_REDUCE_BLANKS
+setopt SHARE_HISTORY
+setopt APPEND_HISTORY
+
+# ── fzf ──
+[[ -f "$HOME/.fzf.zsh" ]] && source "$HOME/.fzf.zsh"
+
+# ── zoxide ──
+(( $+commands[zoxide] )) && eval "$(zoxide init zsh --cmd cd)"
+ENV_BLOCK
 
             case "$SELECTED_THEME" in
                 pure)
+                    echo ""
                     cat << 'PURE_BLOCK'
 # ── Pure Theme ──
 # pure 必须在 source oh-my-zsh.sh 之后加载
@@ -1094,12 +1114,14 @@ prompt pure
 PURE_BLOCK
                     ;;
                 starship)
+                    echo ""
                     cat << 'STARSHIP_BLOCK'
 # ── Starship Prompt ──
 eval "$(starship init zsh)"
 STARSHIP_BLOCK
                     ;;
                 *)
+                    echo ""
                     cat << 'P10K_BLOCK'
 # ── Powerlevel10k Instant Prompt ──
 if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
@@ -1113,41 +1135,8 @@ P10K_BLOCK
                     ;;
             esac
 
-            cat << 'ENV_BLOCK'
-
-# ── Zsh History ──
-HISTFILE="$HOME/.zsh_history"
-HISTSIZE=50000
-SAVEHIST=50000
-setopt HIST_IGNORE_DUPS
-setopt HIST_IGNORE_ALL_DUPS
-setopt HIST_FIND_NO_DUPS
-setopt HIST_REDUCE_BLANKS
-setopt SHARE_HISTORY
-setopt APPEND_HISTORY
-
-# ── Volta ──
-export VOLTA_HOME="$HOME/.volta"
-export VOLTA_FEATURE_PNPM=1
-[[ -d "$VOLTA_HOME/bin" ]] && export PATH="$VOLTA_HOME/bin:$PATH"
-
-# ── Cargo / Rust ──
-[[ -f "$HOME/.cargo/env" ]] && source "$HOME/.cargo/env"
-
-# ── uv (~/.local/bin 已在文件开头统一添加) ──
-
-# ── proto ──
-export PROTO_HOME="$HOME/.proto"
-export PATH="$PROTO_HOME/shims:$PROTO_HOME/bin:$PATH"
-
-# ── fzf ──
-[[ -f "$HOME/.fzf.zsh" ]] && source "$HOME/.fzf.zsh"
-
-# ── zoxide ──
-(( $+commands[zoxide] )) && eval "$(zoxide init zsh --cmd cd)"
-
-# <<< one-click-dev-env <<<
-ENV_BLOCK
+            echo ""
+            echo "# <<< one-click-dev-env <<<"
         } >> "$zshrc"
 
         success ".zshrc 配置完成 (插件管理器: Oh My Zsh, 主题: $SELECTED_THEME)"
