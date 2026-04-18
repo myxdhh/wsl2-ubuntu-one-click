@@ -735,25 +735,25 @@ function Step-CreateUser {
     Write-Info "在子系统 $InstanceName 中创建用户 $username..."
 
     try {
-        wsl -d $InstanceName -u root -- bash -c "id '$username' >/dev/null 2>&1 || useradd -m -s /bin/bash '$username'"
+        wsl -d $InstanceName -u root -- bash -c "id '$username' >/dev/null 2>&1 || useradd -m -s /bin/bash '$username'" | Out-Null
         if ($LASTEXITCODE -ne 0) {
             # 再次验证用户是否存在
-            wsl -d $InstanceName -u root -- bash -c "id '$username'"
+            wsl -d $InstanceName -u root -- bash -c "id '$username'" | Out-Null
             if ($LASTEXITCODE -ne 0) { throw "useradd 失败" }
         }
 
         # TODO: 密码通过 bash -c 参数传递，会短暂出现在进程参数列表中。
         # 尝试过 PowerShell 管道 stdin → chpasswd 的方案，但因 WSL interop
         # 层的编码/转义问题无法可靠工作，暂回退为此方式。
-        wsl -d $InstanceName -u root -- bash -c "echo '${username}:${pwdPlain}' | chpasswd"
+        wsl -d $InstanceName -u root -- bash -c "echo '${username}:${pwdPlain}' | chpasswd" | Out-Null
         if ($LASTEXITCODE -ne 0) { throw "chpasswd 失败" }
 
         # 添加到 sudo 组
-        wsl -d $InstanceName -u root -- bash -c "usermod -aG sudo '$username'"
+        wsl -d $InstanceName -u root -- bash -c "usermod -aG sudo '$username'" | Out-Null
         if ($LASTEXITCODE -ne 0) { throw "usermod 失败" }
 
         # 验证用户创建成功
-        wsl -d $InstanceName -u root -- bash -c "id '$username' && groups '$username'"
+        wsl -d $InstanceName -u root -- bash -c "id '$username' && groups '$username'" | Out-Host
         if ($LASTEXITCODE -ne 0) { throw "用户验证失败" }
 
         Write-Ok "用户 $username 创建完成"
@@ -770,7 +770,7 @@ else
     printf '\n[user]\ndefault=$username\n' >> /etc/wsl.conf
 fi
 "@
-        wsl -d $InstanceName -u root -- bash -c $wslConfScript
+        wsl -d $InstanceName -u root -- bash -c $wslConfScript | Out-Null
         if ($LASTEXITCODE -ne 0) { throw "wsl.conf 配置失败" }
 
         Write-Ok "已将 $username 设为子系统默认用户"
