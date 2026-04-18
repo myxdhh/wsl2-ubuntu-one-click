@@ -552,11 +552,11 @@ function Step-ConfigureWslconfig {
         Write-Info "已备份到: $backupPath"
     }
 
-    Write-Info "请逐项选择配置（直接回车采用 ★默认值）："
+    Write-Info "请逐项选择以下 5 项配置（直接回车采用 ★默认值）："
 
     # ── autoMemoryReclaim ──
     Write-Host ""
-    Write-Host "autoMemoryReclaim - 自动内存回收（[experimental] 节）" -ForegroundColor Cyan
+    Write-Host "(1/5) autoMemoryReclaim - 自动内存回收（[experimental] 节）" -ForegroundColor Cyan
     Write-Host "  1) disabled  - 不自动回收"
     Write-Host "  2) gradual   - 渐进回收 ★默认"
     Write-Host "  3) dropCache - 立即释放缓存"
@@ -570,7 +570,7 @@ function Step-ConfigureWslconfig {
 
     # ── networkingMode ──
     Write-Host ""
-    Write-Host "networkingMode - 网络模式（[wsl2] 节）" -ForegroundColor Cyan
+    Write-Host "(2/5) networkingMode - 网络模式（[wsl2] 节）" -ForegroundColor Cyan
     Write-Host "  1) NAT          - 网络地址转换"
     Write-Host "  2) mirrored     - 镜像模式 ★默认"
     Write-Host "  3) bridged      - 桥接模式"
@@ -588,7 +588,7 @@ function Step-ConfigureWslconfig {
 
     # ── dnsTunneling ──
     Write-Host ""
-    Write-Host "dnsTunneling - DNS 隧道（[wsl2] 节）" -ForegroundColor Cyan
+    Write-Host "(3/5) dnsTunneling - DNS 隧道（[wsl2] 节）" -ForegroundColor Cyan
     Write-Host "  1) true  ★默认"
     Write-Host "  2) false"
     $dtChoice = Read-DefaultInput -Prompt "请选择 (1/2)" -Default "1"
@@ -597,7 +597,7 @@ function Step-ConfigureWslconfig {
 
     # ── firewall ──
     Write-Host ""
-    Write-Host "firewall - 防火墙（[wsl2] 节）" -ForegroundColor Cyan
+    Write-Host "(4/5) firewall - 防火墙（[wsl2] 节）" -ForegroundColor Cyan
     Write-Host "  1) true  ★默认"
     Write-Host "  2) false"
     $fwChoice = Read-DefaultInput -Prompt "请选择 (1/2)" -Default "1"
@@ -606,7 +606,7 @@ function Step-ConfigureWslconfig {
 
     # ── autoProxy ──
     Write-Host ""
-    Write-Host "autoProxy - 自动代理（[wsl2] 节）" -ForegroundColor Cyan
+    Write-Host "(5/5) autoProxy - 自动代理（[wsl2] 节）" -ForegroundColor Cyan
     Write-Host "  1) true  ★默认"
     Write-Host "  2) false"
     $apChoice = Read-DefaultInput -Prompt "请选择 (1/2)" -Default "1"
@@ -806,7 +806,8 @@ fi
 # =============================================================================
 function Step-SelectComponents {
     param(
-        [string]$PluginMgr = "sheldon"
+        [string]$PluginMgr = "sheldon",
+        [string]$Theme = "starship"
     )
 
     Write-Header "步骤 6: 选择要安装的开发工具"
@@ -822,48 +823,112 @@ function Step-SelectComponents {
         @{ Id = "proto"; Name = "proto (多语言版本管理)" }
     )
 
+    $themeDisplayName = switch ($Theme) {
+        "starship" { "Starship" }
+        "p10k"     { "Powerlevel10k" }
+        "pure"     { "Pure" }
+        default    { $Theme }
+    }
+
     if ($PluginMgr -eq "sheldon") {
-        Write-Host "  基础组件 (始终安装): Zsh, Sheldon, 主题, zsh-autosuggestions, fast-syntax-highlighting" -ForegroundColor DarkGray
+        Write-Host "  基础组件 (始终安装): Zsh, Sheldon, $themeDisplayName, zsh-autosuggestions, fast-syntax-highlighting" -ForegroundColor DarkGray
     } else {
-        Write-Host "  基础组件 (始终安装): Zsh, Oh My Zsh, 主题, zsh-autosuggestions, fast-syntax-highlighting" -ForegroundColor DarkGray
+        Write-Host "  基础组件 (始终安装): Zsh, Oh My Zsh, $themeDisplayName, zsh-autosuggestions, fast-syntax-highlighting" -ForegroundColor DarkGray
     }
     Write-Host ""
-    Write-Host "  可选开发工具：" -ForegroundColor Cyan
-
-    for ($i = 0; $i -lt $components.Count; $i++) {
-        $num = $i + 1
-        $name = $components[$i].Name
-        Write-Host "  $num) $name"
-    }
-
+    Write-Host "  可选开发工具（↑↓ 移动，空格 切换，A 全选/全不选，回车 确认）：" -ForegroundColor Cyan
     Write-Host ""
-    while ($true) {
-        $choice = Read-Host "请输入编号 (逗号分隔，如 1,3,4) 或输入 all 全选 [默认: all]"
-        
-        if ([string]::IsNullOrWhiteSpace($choice) -or $choice.Trim().ToLower() -eq "all") {
-            Write-Ok "已选择全部组件"
-            return "" # empty means all in setup-dev-env.sh
+
+    # 初始化选中状态（默认全选）
+    $selected = @($true) * $components.Count
+    $cursor = 0
+
+    # 渲染菜单的辅助函数
+    function Render-Menu {
+        # 将光标移回菜单起始位置
+        [Console]::SetCursorPosition(0, [Console]::CursorTop - $components.Count)
+
+        for ($i = 0; $i -lt $components.Count; $i++) {
+            $check = if ($selected[$i]) { "[✓]" } else { "[ ]" }
+            $name = $components[$i].Name
+
+            if ($i -eq $cursor) {
+                Write-Host "  ► $check $name  " -ForegroundColor Cyan
+            }
+            else {
+                Write-Host "    $check $name  "
+            }
         }
-        
-        $selectedIds = @()
-        $nums = $choice -split ','
-        $valid = $true
-        
-        foreach ($n in $nums) {
-            $n = $n.Trim()
-            if ($n -notmatch "^\d+$" -or [int]$n -lt 1 -or [int]$n -gt $components.Count) {
-                Write-Err "无效输入: $n，请重新输入"
-                $valid = $false
+    }
+
+    # 首次绘制菜单
+    for ($i = 0; $i -lt $components.Count; $i++) {
+        $check = if ($selected[$i]) { "[✓]" } else { "[ ]" }
+        $name = $components[$i].Name
+
+        if ($i -eq $cursor) {
+            Write-Host "  ► $check $name" -ForegroundColor Cyan
+        }
+        else {
+            Write-Host "    $check $name"
+        }
+    }
+
+    # 交互循环
+    while ($true) {
+        $key = [Console]::ReadKey($true)
+
+        switch ($key.Key) {
+            "UpArrow" {
+                $cursor = if ($cursor -le 0) { $components.Count - 1 } else { $cursor - 1 }
+                Render-Menu
+            }
+            "DownArrow" {
+                $cursor = if ($cursor -ge ($components.Count - 1)) { 0 } else { $cursor + 1 }
+                Render-Menu
+            }
+            "Spacebar" {
+                $selected[$cursor] = -not $selected[$cursor]
+                Render-Menu
+            }
+            "A" {
+                # 切换全选/全不选：如果当前全部选中则全不选，否则全选
+                $allSelected = ($selected | Where-Object { $_ }).Count -eq $components.Count
+                for ($i = 0; $i -lt $components.Count; $i++) {
+                    $selected[$i] = -not $allSelected
+                }
+                Render-Menu
+            }
+            "Enter" {
                 break
             }
-            $selectedIds += $components[[int]$n - 1].Id
         }
-        
-        if ($valid -and $selectedIds.Count -gt 0) {
-            $compString = $selectedIds -join ","
-            Write-Ok "已选择: $compString"
-            return $compString
+
+        if ($key.Key -eq "Enter") { break }
+    }
+
+    Write-Host ""
+
+    # 收集已选组件
+    $selectedIds = @()
+    for ($i = 0; $i -lt $components.Count; $i++) {
+        if ($selected[$i]) {
+            $selectedIds += $components[$i].Id
         }
+    }
+
+    if ($selectedIds.Count -eq $components.Count) {
+        Write-Ok "已选择全部组件"
+        return "" # empty means all in setup-dev-env.sh
+    }
+    elseif ($selectedIds.Count -eq 0) {
+        Write-Warn "未选择任何可选组件，仅安装基础组件"
+        return "none"
+    }
+    else {
+        $compString = $selectedIds -join ","
+        Write-Ok "已选择: $compString"
+        return $compString
     }
 }
 
@@ -1039,7 +1104,7 @@ function Main {
     Step-InstallFont
 
     # 步骤 6: 选择组件
-    $components = Step-SelectComponents -PluginMgr $pluginMgr
+    $components = Step-SelectComponents -PluginMgr $pluginMgr -Theme $theme
 
     # 关闭 WSL 使 .wslconfig + wsl.conf 生效
     Write-Info "正在重启 WSL 以应用配置..."

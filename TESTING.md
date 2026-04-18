@@ -6,10 +6,7 @@
 # 构建
 docker build -t wsl-dev-test .
 
-# 运行（TUN 模式或可直连环境，使用 --network host）
-docker run -it --rm --network host wsl-dev-test
-
-# 运行（HTTP 代理模式）
+# 运行（需代理访问 GitHub 等外网资源）
 docker run -it --rm \
   -e http_proxy=http://host.docker.internal:10809 \
   -e https_proxy=http://host.docker.internal:10809 \
@@ -19,15 +16,17 @@ docker run -it --rm \
 docker rmi wsl-dev-test && docker builder prune -f
 ```
 
-> **注意**：Dockerfile 已将 apt 源切换到 USTC 镜像，apt-get 无需代理即可下载。
+> **注意**：
+> - Dockerfile 已将 apt 源切换到 USTC 镜像，apt 无需代理
+> - Docker Desktop WSL2 下 `--network host` 映射到 Docker VM 网络、**不等于**宿主机网络，TUN 模式不生效
+> - 必须通过 `-e http_proxy=http://host.docker.internal:<端口>` 传入代理
 
 ---
 
 ## 验证方法约定
 
-所有安装后的验证统一使用 `zsh -c 'source ~/.zshrc && ...'`，确保 PATH 和环境变量与用户实际使用一致。
-
-安装日志使用 `grep -E` 过滤关键行实时输出，避免 `tail` 管道阻塞。
+- 安装后验证统一使用 `zsh -c "source ~/.zshrc && ..."` 加载完整环境（PATH、env）
+- 安装日志使用 `grep -E "^\[|^══"` 过滤关键行实时输出，避免 `tail` 管道阻塞
 
 ---
 
@@ -41,18 +40,21 @@ bash -n setup-dev-env.sh && echo "PASS" || echo "FAIL"
 
 ---
 
-## TC-02: 一键安装（默认 Sheldon + Starship，全组件）
+## TC-02: 一键安装（默认 Sheldon + Starship，全组件含 eza/yazi）
 
 **验收标准**：
 
-- [ ] 所有基础组件安装成功
-- [ ] 所有可选组件安装成功
-- [ ] `plugins.toml` 包含 compinit、fzf-tab、zsh-completions、custom-completions
-- [ ] `.zshrc` 标记块完整（sheldon source、starship、history）
-- [ ] 补全文件生成到 `~/.zsh/completions/`
+- [x] 所有基础组件安装成功（zsh, sheldon, starship, fzf-tab 等）
+- [x] 所有可选组件安装成功（fzf, zoxide, rustup, eza, yazi, volta, uv, proto）
+- [x] `plugins.toml` 包含 compinit、fzf-tab、zsh-completions、custom-completions
+- [x] `.zshrc` 标记块完整（sheldon source、starship、HISTSIZE=50000）
+- [x] 补全文件生成到 `~/.zsh/completions/`（_proto, _uv, _volta, _rustup, _cargo）
 
 ```bash
-docker run --rm --network host wsl-dev-test bash -c '
+docker run --rm \
+  -e http_proxy=http://host.docker.internal:10809 \
+  -e https_proxy=http://host.docker.internal:10809 \
+  wsl-dev-test bash -c '
 bash setup-dev-env.sh --install 2>&1 | grep -E "^\[|^══" | head -60
 
 echo ""
@@ -96,19 +98,22 @@ ls ~/.zsh/completions/ 2>/dev/null
 
 **验收标准**：
 
-- [ ] OMZ 安装到 `~/.oh-my-zsh`
-- [ ] `.zshrc` 包含 `source $ZSH/oh-my-zsh.sh`
-- [ ] `.zshrc` 的 plugins 列表包含 fzf-tab、zsh-completions
-- [ ] `.zshrc` 标记块包含 p10k 配置
-- [ ] 补全文件生成到 `~/.oh-my-zsh/completions/`
-- [ ] 无 `eval "$(sheldon source)"` 行
+- [x] OMZ 安装到 `~/.oh-my-zsh`
+- [x] `.zshrc` 包含 `source $ZSH/oh-my-zsh.sh`
+- [x] `.zshrc` 的 plugins 列表包含 fzf-tab、zsh-completions
+- [x] `.zshrc` 标记块包含 p10k 配置
+- [x] 补全文件生成到 `~/.oh-my-zsh/completions/`
+- [x] 无 `eval "$(sheldon source)"` 行
 
 ```bash
-docker run --rm --network host wsl-dev-test bash -c '
+docker run --rm \
+  -e http_proxy=http://host.docker.internal:10809 \
+  -e https_proxy=http://host.docker.internal:10809 \
+  wsl-dev-test bash -c '
 bash setup-dev-env.sh --install --plugin-mgr ohmyzsh --theme p10k --components fzf,zoxide,volta,uv,proto 2>&1 | grep -E "^\[|^══" | head -40
 
 zsh -c "source ~/.zshrc 2>/dev/null
-echo \"--- OMZ ---\"
+echo \"--- TC-03 验证 ---\"
 [[ -d ~/.oh-my-zsh ]] && echo \"PASS: omz dir\" || echo \"FAIL: omz dir\"
 grep -q \"source.*oh-my-zsh.sh\" ~/.zshrc && echo \"PASS: omz source\" || echo \"FAIL: omz source\"
 grep -q fzf-tab ~/.zshrc && echo \"PASS: fzf-tab in plugins\" || echo \"FAIL: fzf-tab\"
@@ -127,15 +132,23 @@ ls ~/.oh-my-zsh/completions/ 2>/dev/null
 
 ## TC-04: 插件管理器切换 Sheldon → Oh My Zsh
 
-**验收标准**：切换后 `.zshrc` 无 sheldon 残留，OMZ 模板恢复
+**验收标准**：
+
+- [x] 切换后 `.zshrc` 无 sheldon 残留
+- [x] OMZ 模板恢复
+- [x] 主题切换生效
 
 ```bash
-docker run --rm --network host wsl-dev-test bash -c '
-bash setup-dev-env.sh --install --plugin-mgr sheldon --theme starship --components fzf 2>&1 | grep -E "^\[OK\]|^══" | tail -5
-bash setup-dev-env.sh --install --plugin-mgr ohmyzsh --theme p10k --components fzf 2>&1 | grep -E "^\[OK\]|^══" | tail -5
+docker run --rm \
+  -e http_proxy=http://host.docker.internal:10809 \
+  -e https_proxy=http://host.docker.internal:10809 \
+  wsl-dev-test bash -c '
+bash setup-dev-env.sh --install --plugin-mgr sheldon --theme starship --components fzf 2>&1 | grep -E "^\[OK\]" | tail -3
+echo "--- 切换到 OMZ ---"
+bash setup-dev-env.sh --install --plugin-mgr ohmyzsh --theme p10k --components fzf 2>&1 | grep -E "^\[OK\]" | tail -3
 
 zsh -c "source ~/.zshrc 2>/dev/null
-echo \"--- 切换后 ---\"
+echo \"--- TC-04 结果 ---\"
 ! grep -q \"sheldon source\" ~/.zshrc && echo \"PASS: sheldon清除\" || echo \"FAIL: sheldon残留\"
 grep -q \"source.*oh-my-zsh.sh\" ~/.zshrc && echo \"PASS: omz恢复\" || echo \"FAIL: omz缺失\"
 grep -q p10k ~/.zshrc && echo \"PASS: p10k主题\" || echo \"FAIL: p10k缺失\"
@@ -148,15 +161,23 @@ grep -q p10k ~/.zshrc && echo \"PASS: p10k主题\" || echo \"FAIL: p10k缺失\"
 
 ## TC-05: 插件管理器切换 Oh My Zsh → Sheldon
 
-**验收标准**：切换后 `.zshrc` 无 OMZ 模板残留，sheldon 加载正常
+**验收标准**：
+
+- [x] 切换后无 OMZ 模板残留
+- [x] Sheldon 加载正常
+- [x] `plugins.toml` 存在
 
 ```bash
-docker run --rm --network host wsl-dev-test bash -c '
-bash setup-dev-env.sh --install --plugin-mgr ohmyzsh --theme p10k --components fzf 2>&1 | grep -E "^\[OK\]|^══" | tail -5
-bash setup-dev-env.sh --install --plugin-mgr sheldon --theme starship --components fzf 2>&1 | grep -E "^\[OK\]|^══" | tail -5
+docker run --rm \
+  -e http_proxy=http://host.docker.internal:10809 \
+  -e https_proxy=http://host.docker.internal:10809 \
+  wsl-dev-test bash -c '
+bash setup-dev-env.sh --install --plugin-mgr ohmyzsh --theme p10k --components fzf 2>&1 | grep -E "^\[OK\]" | tail -3
+echo "--- 切换到 Sheldon ---"
+bash setup-dev-env.sh --install --plugin-mgr sheldon --theme starship --components fzf 2>&1 | grep -E "^\[OK\]" | tail -3
 
 zsh -c "source ~/.zshrc 2>/dev/null
-echo \"--- 切换后 ---\"
+echo \"--- TC-05 结果 ---\"
 grep -q \"sheldon source\" ~/.zshrc && echo \"PASS: sheldon加载\" || echo \"FAIL: sheldon缺失\"
 ! grep -q \"source.*oh-my-zsh.sh\" ~/.zshrc && echo \"PASS: omz清除\" || echo \"FAIL: omz残留\"
 ! grep -q \"^export ZSH=\" ~/.zshrc && echo \"PASS: ZSH变量清除\" || echo \"FAIL: ZSH变量残留\"
@@ -171,12 +192,17 @@ grep -q \"starship init zsh\" ~/.zshrc && echo \"PASS: starship主题\" || echo 
 
 ## TC-06: 幂等性验证
 
-**验收标准**：重复执行脚本不产生副作用（无报错、标记块无重复）
+**验收标准**：
+
+- [x] 重复执行脚本不产生副作用（无报错、标记块无重复）
 
 ```bash
-docker run --rm --network host wsl-dev-test bash -c '
-bash setup-dev-env.sh --install --components fzf,zoxide 2>&1 | grep -E "^\[|^══" | tail -5
-bash setup-dev-env.sh --install --components fzf,zoxide 2>&1 | grep -E "^\[|^══" | tail -5
+docker run --rm \
+  -e http_proxy=http://host.docker.internal:10809 \
+  -e https_proxy=http://host.docker.internal:10809 \
+  wsl-dev-test bash -c '
+bash setup-dev-env.sh --install --components fzf,zoxide 2>&1 | grep -E "^\[OK\]" | tail -3
+bash setup-dev-env.sh --install --components fzf,zoxide 2>&1 | grep -E "^\[OK\]" | tail -3
 
 count=$(grep -c "one-click-dev-env >>>" ~/.zshrc)
 [[ "$count" -eq 1 ]] && echo "PASS: 标记块唯一" || echo "FAIL: 标记块重复($count)"
@@ -187,10 +213,16 @@ count=$(grep -c "one-click-dev-env >>>" ~/.zshrc)
 
 ## TC-07: 部分组件安装
 
-**验收标准**：仅安装指定的可选组件，基础组件始终安装
+**验收标准**：
+
+- [x] 仅安装指定的可选组件
+- [x] 基础组件（zsh, sheldon, starship 等）始终安装
 
 ```bash
-docker run --rm --network host wsl-dev-test bash -c '
+docker run --rm \
+  -e http_proxy=http://host.docker.internal:10809 \
+  -e https_proxy=http://host.docker.internal:10809 \
+  wsl-dev-test bash -c '
 bash setup-dev-env.sh --install --components volta,uv 2>&1 | grep -E "^\[|^══" | tail -10
 
 zsh -c "source ~/.zshrc 2>/dev/null
@@ -207,12 +239,19 @@ command -v sheldon && echo \"PASS: sheldon(基础)\" || echo \"FAIL: sheldon\"
 
 ## TC-08: 一键卸载
 
-**验收标准**：所有组件被移除，`.zshrc` 标记块被清除，用户自定义配置保留
+**验收标准**：
+
+- [x] 所有组件被移除
+- [x] `.zshrc` 标记块被清除
+- [x] 用户自定义配置保留
 
 ```bash
-docker run --rm --network host wsl-dev-test bash -c '
+docker run --rm \
+  -e http_proxy=http://host.docker.internal:10809 \
+  -e https_proxy=http://host.docker.internal:10809 \
+  wsl-dev-test bash -c '
 echo "# MY_CUSTOM_CONFIG=true" >> ~/.zshrc
-bash setup-dev-env.sh --install --components fzf,zoxide 2>&1 | grep -E "^\[|^══" | tail -5
+bash setup-dev-env.sh --install --components fzf,zoxide 2>&1 | grep -E "^\[OK\]" | tail -3
 bash setup-dev-env.sh --uninstall 2>&1 | grep -E "^\[|^══" | tail -10
 
 ! command -v sheldon && echo "PASS: sheldon卸载" || echo "FAIL: sheldon残留"
@@ -225,10 +264,15 @@ grep -q "MY_CUSTOM_CONFIG" ~/.zshrc && echo "PASS: 用户配置保留" || echo "
 
 ## TC-09: 主题切换
 
-**验收标准**：切换主题后配置正确更新
+**验收标准**：
+
+- [x] 切换主题后配置正确更新
 
 ```bash
-docker run --rm --network host wsl-dev-test bash -c '
+docker run --rm \
+  -e http_proxy=http://host.docker.internal:10809 \
+  -e https_proxy=http://host.docker.internal:10809 \
+  wsl-dev-test bash -c '
 bash setup-dev-env.sh --install --theme starship --components fzf 2>&1 | grep -E "^\[OK\]" | tail -3
 bash setup-dev-env.sh --install --theme p10k --components fzf 2>&1 | grep -E "^\[OK\]" | tail -3
 
@@ -241,8 +285,29 @@ grep -q "p10k" ~/.zshrc && echo "PASS: p10k配置" || echo "FAIL: p10k缺失"
 
 ## TC-10: 帮助信息
 
-**验收标准**：`--help` 输出帮助并退出
+**验收标准**：
+
+- [x] `--help` 输出帮助并退出
 
 ```bash
 bash setup-dev-env.sh --help | grep -q "可选值" && echo "PASS" || echo "FAIL"
 ```
+
+---
+
+## 测试结果汇总
+
+| 用例 | 描述 | 状态 |
+|------|------|------|
+| TC-01 | 语法检查 | ✅ PASS |
+| TC-02 | 全组件安装（Sheldon + Starship，含 eza/yazi） | ✅ PASS |
+| TC-03 | OMZ + Powerlevel10k 安装 | ✅ PASS |
+| TC-04 | 切换 Sheldon → Oh My Zsh | ✅ PASS |
+| TC-05 | 切换 Oh My Zsh → Sheldon | ✅ PASS |
+| TC-06 | 幂等性验证 | ✅ PASS |
+| TC-07 | 部分组件安装 | ✅ PASS |
+| TC-08 | 一键卸载 | ✅ PASS |
+| TC-09 | 主题切换 | ✅ PASS |
+| TC-10 | 帮助信息 | ✅ PASS |
+
+> 已知问题：Volta 2.0 在 Docker 容器中 `volta install node` 可能失败（无法解包 Node 归档），这是 Volta 的 bug，不影响 Volta 本身安装。
