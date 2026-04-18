@@ -734,6 +734,14 @@ function Step-CreateUser {
     # 在 WSL 内创建用户
     Write-Info "在子系统 $InstanceName 中创建用户 $username..."
 
+    # 首次启动子系统以完成初始化（--no-launch 安装后 PAM 等子系统未就绪，
+    # 直接调用 chpasswd 会报 "pam_chauthtok() failed" 错误）
+    Write-Info "初始化子系统..."
+    wsl -d $InstanceName -u root -- bash -c "echo 'WSL init OK'" | Out-Host
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warn "子系统初始化返回非零退出码，继续尝试..."
+    }
+
     try {
         wsl -d $InstanceName -u root -- bash -c "id '$username' >/dev/null 2>&1 || useradd -m -s /bin/bash '$username'"
         if ($LASTEXITCODE -ne 0) {
