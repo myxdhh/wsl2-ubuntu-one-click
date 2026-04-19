@@ -503,6 +503,7 @@ install_starship_theme() {
         success "Starship 已安装: $(starship --version 2>&1 | head -1)"
     else
         info "正在安装 Starship..."
+        mkdir -p "$HOME/.local/bin"
         if ! curl -sS https://starship.rs/install.sh | sh -s -- --yes --bin-dir "$HOME/.local/bin" 2>&1 | tee -a "$LOG_FILE"; then
             record_failure "starship-theme"
             return 1
