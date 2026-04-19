@@ -90,6 +90,12 @@ bash setup-dev-env.sh --install
 # 使用 Oh My Zsh 插件管理器并指定主题
 bash setup-dev-env.sh --install --plugin-mgr ohmyzsh --theme p10k
 
+# 指定 Catppuccin 风味（同时影响 Starship 和 fzf 配色）
+bash setup-dev-env.sh --install --theme starship --flavor latte
+
+# 仅切换风味（Starship 已安装时不重复安装）
+bash setup-dev-env.sh --install --theme starship --flavor macchiato
+
 # 仅安装部分组件
 bash setup-dev-env.sh --install --components rustup volta uv
 
@@ -101,6 +107,15 @@ bash setup-dev-env.sh
 ```
 
 `--components` 可选值：`fzf`, `zoxide`, `rustup`, `eza`, `yazi`, `volta`, `uv`, `proto`
+
+`--flavor` 可选值：
+
+| 风味 | 风格 | 适用场景 |
+|---|---|---|
+| `mocha` (默认) | 深色 | 最常用，经典款 |
+| `macchiato` | 深色偏暖 | 偏好暖色调 |
+| `frappe` | 中间色调 | 折中方案 |
+| `latte` | 浅色 | 日间使用 |
 
 ## 安装的组件
 
@@ -127,7 +142,7 @@ bash setup-dev-env.sh
 
 ## 安装后
 
-- **Starship 主题**：已自动配置 catppuccin-powerline 预设，配置文件位于 `~/.config/starship.toml`
+- **Starship 主题**：已自动配置 catppuccin-powerline 预设，配置文件位于 `~/.config/starship.toml`。支持 4 种 Catppuccin 风味（Mocha/Macchiato/Frappé/Latte），切换时会同步更新 fzf 配色
 - **Powerlevel10k 主题**：进入 WSL 子系统后，通常会提示配置向导。如果没有，可手动运行：
 
 ```bash

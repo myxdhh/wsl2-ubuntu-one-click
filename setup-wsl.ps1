@@ -249,24 +249,48 @@ function Step-SelectTheme {
     Write-Host "     注意：宿主机无需安装任何特殊字体" -ForegroundColor Green
     Write-Host ""
 
+    $selectedTheme = ""
+    $selectedFlavor = "mocha"
+
     while ($true) {
         $choice = Read-Host "请选择主题 (1/2/3) [默认: 1]"
         if ([string]::IsNullOrWhiteSpace($choice) -or $choice -eq "1") {
+            $selectedTheme = "starship"
             Write-Ok "已选择: Starship (catppuccin-powerline)"
-            return "starship"
+            break
         }
         elseif ($choice -eq "2") {
+            $selectedTheme = "p10k"
             Write-Ok "已选择: Powerlevel10k"
-            return "p10k"
+            return @{ Theme = "p10k"; Flavor = "" }
         }
         elseif ($choice -eq "3") {
+            $selectedTheme = "pure"
             Write-Ok "已选择: Pure"
-            return "pure"
+            return @{ Theme = "pure"; Flavor = "" }
         }
         else {
             Write-Err "无效输入，请重新选择"
         }
     }
+
+    # Starship 选中后追加 Catppuccin 风味选择
+    Write-Host ""
+    Write-Host "  Catppuccin 风味（同时影响 提示符主题 和 fzf 配色）：" -ForegroundColor Cyan
+    Write-Host "    1) Mocha   (深色，经典款) ★默认" -ForegroundColor White
+    Write-Host "    2) Macchiato (深色偏暖)" -ForegroundColor White
+    Write-Host "    3) Frappé  (中间色调)" -ForegroundColor White
+    Write-Host "    4) Latte   (浅色)" -ForegroundColor White
+    Write-Host ""
+    $flavorChoice = Read-DefaultInput -Prompt "选择风味 (1-4)" -Default "1"
+    switch ($flavorChoice) {
+        "2" { $selectedFlavor = "macchiato"; Write-Ok "已选择风味: Macchiato" }
+        "3" { $selectedFlavor = "frappe"; Write-Ok "已选择风味: Frappé" }
+        "4" { $selectedFlavor = "latte"; Write-Ok "已选择风味: Latte" }
+        default { $selectedFlavor = "mocha"; Write-Ok "已选择风味: Mocha" }
+    }
+
+    return @{ Theme = $selectedTheme; Flavor = $selectedFlavor }
 }
 
 # =============================================================================
@@ -951,6 +975,7 @@ function Step-RunDevEnvScript {
         [string]$Username,
         [string]$PluginMgr,
         [string]$Theme,
+        [string]$Flavor,
         [string]$Components
     )
 
@@ -1017,6 +1042,9 @@ function Step-RunDevEnvScript {
     }
     if (-not [string]::IsNullOrEmpty($Theme)) {
         $cmd += " --theme $Theme"
+    }
+    if (-not [string]::IsNullOrEmpty($Flavor)) {
+        $cmd += " --flavor $Flavor"
     }
     if (-not [string]::IsNullOrEmpty($Components)) {
         $cmd += " --components `"$Components`""
@@ -1108,7 +1136,9 @@ function Main {
     $pluginMgr = Step-SelectPluginMgr
 
     # 步骤 4b: 选择主题
-    $theme = Step-SelectTheme
+    $themeResult = Step-SelectTheme
+    $theme = $themeResult.Theme
+    $flavor = $themeResult.Flavor
 
     # 步骤 5: 安装字体
     Step-InstallFont
@@ -1122,7 +1152,7 @@ function Main {
     Start-Sleep -Seconds 3
 
     # 步骤 7: 执行开发环境脚本
-    Step-RunDevEnvScript -InstanceName $instanceName -Username $username -PluginMgr $pluginMgr -Theme $theme -Components $components
+    Step-RunDevEnvScript -InstanceName $instanceName -Username $username -PluginMgr $pluginMgr -Theme $theme -Flavor $flavor -Components $components
 
     $elapsed = (Get-Date) - $startTime
     $elapsedStr = "{0:D2}:{1:D2}:{2:D2}" -f $elapsed.Hours, $elapsed.Minutes, $elapsed.Seconds

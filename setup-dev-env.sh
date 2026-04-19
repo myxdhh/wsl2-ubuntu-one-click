@@ -90,6 +90,13 @@ if [[ -d "$HOME/.oh-my-zsh" ]] && ! command -v sheldon &>/dev/null; then
 else
     SELECTED_PLUGIN_MGR="sheldon"
 fi
+# Catppuccin 风味: mocha (默认), macchiato, frappe, latte
+# 自动检测：如已有 starship.toml，读取当前 palette
+if [[ -f "$HOME/.config/starship.toml" ]] && grep -q 'palette.*catppuccin_' "$HOME/.config/starship.toml" 2>/dev/null; then
+    SELECTED_CATPPUCCIN_FLAVOR="$(grep 'palette' "$HOME/.config/starship.toml" | sed 's/.*catppuccin_//' | sed 's/".*//' | head -1)"
+else
+    SELECTED_CATPPUCCIN_FLAVOR="mocha"
+fi
 # 可选为空（全选），或逗号分隔的组件标识符 (如 "rustup,volta,uv")
 SELECTED_COMPONENTS=""
 # 是否自动清理原脚本文件
@@ -242,6 +249,109 @@ source_uv_env() {
 source_proto_env() {
     export PROTO_HOME="$HOME/.proto"
     export PATH="$PROTO_HOME/shims:$PROTO_HOME/bin:$PATH"
+}
+
+# ─── Catppuccin 风味辅助函数 ─────────────────────────────────────────────────
+
+# 返回指定 Catppuccin 风味的 fzf --color 参数
+get_fzf_catppuccin_colors() {
+    case "${1:-mocha}" in
+        mocha)
+            echo "bg+:#313244,bg:#1e1e2e,spinner:#f5e0dc,hl:#f38ba8,fg:#cdd6f4,header:#f38ba8,info:#cba6f7,pointer:#f5e0dc,marker:#b4befe,fg+:#cdd6f4,prompt:#cba6f7,hl+:#f38ba8"
+            ;;
+        macchiato)
+            echo "bg+:#363a4f,bg:#24273a,spinner:#f4dbd6,hl:#ed8796,fg:#cad3f5,header:#ed8796,info:#c6a0f6,pointer:#f4dbd6,marker:#b7bdf8,fg+:#cad3f5,prompt:#c6a0f6,hl+:#ed8796"
+            ;;
+        frappe)
+            echo "bg+:#414559,bg:#303446,spinner:#f2d5cf,hl:#e78284,fg:#c6d0f5,header:#e78284,info:#ca9ee6,pointer:#f2d5cf,marker:#babbf1,fg+:#c6d0f5,prompt:#ca9ee6,hl+:#e78284"
+            ;;
+        latte)
+            echo "bg+:#ccd0da,bg:#eff1f5,spinner:#dc8a78,hl:#d20f39,fg:#4c4f69,header:#d20f39,info:#8839ef,pointer:#dc8a78,marker:#7287fd,fg+:#4c4f69,prompt:#8839ef,hl+:#d20f39"
+            ;;
+    esac
+}
+
+# 交互式 Catppuccin 风味选择（fzf 驱动，带 git diff 风格预览）
+select_catppuccin_flavor() {
+    info "选择 Catppuccin 风味（同时影响 Starship 和 fzf 配色）"
+    echo ""
+
+    if ! command_exists fzf; then
+        # fzf 不可用时回退到普通菜单
+        echo -e "  ${CYAN}1${NC}) Mocha (深色) ★默认"
+        echo -e "  ${CYAN}2${NC}) Macchiato (深色偏暖)"
+        echo -e "  ${CYAN}3${NC}) Frapp\u00e9 (中间色调)"
+        echo -e "  ${CYAN}4${NC}) Latte (浅色)"
+        echo ""
+        local default_choice="1"
+        [[ "$SELECTED_CATPPUCCIN_FLAVOR" == "macchiato" ]] && default_choice="2"
+        [[ "$SELECTED_CATPPUCCIN_FLAVOR" == "frappe" ]] && default_choice="3"
+        [[ "$SELECTED_CATPPUCCIN_FLAVOR" == "latte" ]] && default_choice="4"
+        read -rp "请选择风味 (1-4) [默认: ${SELECTED_CATPPUCCIN_FLAVOR}]: " flavor_choice
+        case "$flavor_choice" in
+            2) SELECTED_CATPPUCCIN_FLAVOR="macchiato" ;;
+            3) SELECTED_CATPPUCCIN_FLAVOR="frappe" ;;
+            4) SELECTED_CATPPUCCIN_FLAVOR="latte" ;;
+            1) SELECTED_CATPPUCCIN_FLAVOR="mocha" ;;
+            *) ;; # 保持当前值
+        esac
+    else
+        # 用 fzf + --preview 实现 git diff 风格的配色预览
+        local selected
+        selected=$(printf '%s\n' "mocha" "macchiato" "frappe" "latte" | \
+            fzf --height=20 --layout=reverse --border=rounded \
+                --header="选择 Catppuccin 风味（↑↓ 移动，Enter 确认）" \
+                --preview='
+                    case {} in
+                        mocha)
+                            BG="30;30;46" FG="205;214;244" RED="243;139;168"
+                            GREEN="166;227;161" BLUE="137;180;250" SUB="166;173;200"
+                            ;;
+                        macchiato)
+                            BG="36;39;58" FG="202;211;245" RED="237;135;150"
+                            GREEN="166;218;149" BLUE="138;173;244" SUB="165;173;203"
+                            ;;
+                        frappe)
+                            BG="48;52;70" FG="198;208;245" RED="231;130;132"
+                            GREEN="166;209;137" BLUE="140;170;238" SUB="165;173;206"
+                            ;;
+                        latte)
+                            BG="239;241;245" FG="76;79;105" RED="210;15;57"
+                            GREEN="64;160;43" BLUE="30;102;245" SUB="108;111;133"
+                            ;;
+                    esac
+                    R="\033[0m"
+                    bg="\033[48;2;${BG}m"
+                    fg="\033[38;2;${FG}m"
+                    red="\033[38;2;${RED}m"
+                    green="\033[38;2;${GREEN}m"
+                    blue="\033[38;2;${BLUE}m"
+                    sub="\033[38;2;${SUB}m"
+
+                    printf "${bg}${blue} diff --git a/starship.toml b/starship.toml${R}\n"
+                    printf "${bg}${blue} --- a/starship.toml${R}\n"
+                    printf "${bg}${blue} +++ b/starship.toml${R}\n"
+                    printf "${bg}${sub} @@ -1,2 +1,2 @@${R}\n"
+                    printf "${bg}${red} -palette = \"catppuccin_mocha\"${R}\n"
+                    printf "${bg}${green} +palette = \"catppuccin_{}\"${R}\n"
+                    printf "${bg}${fg}  ${R}\n"
+                    printf "${bg}${blue} diff --git a/.zshrc b/.zshrc${R}\n"
+                    printf "${bg}${blue} --- a/.zshrc${R}\n"
+                    printf "${bg}${blue} +++ b/.zshrc${R}\n"
+                    printf "${bg}${sub} @@ -5,4 +5,4 @@${R}\n"
+                    printf "${bg}${fg}  export FZF_DEFAULT_OPTS=\"${R}\n"
+                    printf "${bg}${fg}    --height=60%% --layout=reverse${R}\n"
+                    printf "${bg}${red} -  --color=bg:#1e1e2e,fg:#cdd6f4,hl:#f38ba8${R}\n"
+                    printf "${bg}${green} +  --color=bg:#...,fg:#...,hl:#...  ({})${R}\n"
+                    printf "${bg}${fg}    --prompt='\''\u276f '\''${R}\n"
+                    printf "${bg}${fg}  \"${R}\n"
+                ' \
+                --preview-window=right:55%:wrap)
+
+        SELECTED_CATPPUCCIN_FLAVOR="${selected:-$SELECTED_CATPPUCCIN_FLAVOR}"
+    fi
+
+    success "已选择 Catppuccin 风味: $SELECTED_CATPPUCCIN_FLAVOR"
 }
 
 # ─── 安装函数 ─────────────────────────────────────────────────────────────────
@@ -515,18 +625,28 @@ install_starship_theme() {
     # 配置 catppuccin-powerline 预设
     local starship_config="$HOME/.config/starship.toml"
     if [[ -f "$starship_config" ]]; then
-        info "Starship 配置已存在，保留现有配置: $starship_config"
+        # 配置已存在，更新 Catppuccin 风味
+        if grep -q '^palette' "$starship_config"; then
+            sed -i "s/^palette.*/palette = \"catppuccin_${SELECTED_CATPPUCCIN_FLAVOR}\"/" "$starship_config"
+            success "Catppuccin 风味已更新为: $SELECTED_CATPPUCCIN_FLAVOR"
+        else
+            info "Starship 配置已存在但非 Catppuccin 预设，保留现有配置"
+        fi
     else
         info "正在生成 catppuccin-powerline 预设..."
         mkdir -p "$HOME/.config"
         if starship preset catppuccin-powerline -o "$starship_config" 2>&1 | tee -a "$LOG_FILE"; then
+            # 设置选定的 Catppuccin 风味
+            if grep -q '^palette' "$starship_config"; then
+                sed -i "s/^palette.*/palette = \"catppuccin_${SELECTED_CATPPUCCIN_FLAVOR}\"/" "$starship_config"
+            fi
             # 确保 line_break 不被禁用
             if grep -q '^\[line_break\]' "$starship_config"; then
                 sed -i '/^\[line_break\]/,/^\[/{s/disabled = true/disabled = false/}' "$starship_config"
             else
                 printf '\n[line_break]\ndisabled = false\n' >> "$starship_config"
             fi
-            success "catppuccin-powerline 预设已配置"
+            success "catppuccin-powerline 预设已配置 (风味: $SELECTED_CATPPUCCIN_FLAVOR)"
         else
             warn "预设生成失败，Starship 将使用默认配置"
         fi
@@ -922,7 +1042,13 @@ inline = '''
 if [[ -f "$HOME/.fzf.zsh" ]]; then
   source "$HOME/.fzf.zsh"
 elif (( $+commands[fzf] )); then
-  source <(fzf --zsh 2>/dev/null)
+  if [[ -n "$(fzf --zsh 2>/dev/null)" ]]; then
+    source <(fzf --zsh)
+  else
+    # apt 安装的 fzf (< 0.48)，加载发行版提供的快捷键和补全
+    [[ -f /usr/share/doc/fzf/examples/key-bindings.zsh ]] && source /usr/share/doc/fzf/examples/key-bindings.zsh
+    [[ -f /usr/share/doc/fzf/examples/completion.zsh ]] && source /usr/share/doc/fzf/examples/completion.zsh
+  fi
 fi
 '''
 
@@ -1040,11 +1166,27 @@ setopt HIST_FIND_NO_DUPS
 setopt HIST_REDUCE_BLANKS
 setopt SHARE_HISTORY
 setopt APPEND_HISTORY
+ENV_BLOCK
+
+            # FZF_DEFAULT_OPTS 需要变量展开，不能放在单引号 heredoc 中
+            local fzf_colors
+            fzf_colors="$(get_fzf_catppuccin_colors "$SELECTED_CATPPUCCIN_FLAVOR")"
+            cat << FZF_OPTS
+
+# ── fzf 配色 (Catppuccin ${SELECTED_CATPPUCCIN_FLAVOR}) ──
+export FZF_DEFAULT_OPTS="
+  --height=60% --layout=reverse --border=rounded
+  --color=${fzf_colors}
+  --prompt='❯ ' --pointer='▸' --marker='✓'
+"
+FZF_OPTS
+
+            cat << 'SHELDON_BLOCK'
 
 # ── Sheldon (Plugin Manager) ──
 # 配置文件: ~/.config/sheldon/plugins.toml
 eval "$(sheldon source)"
-ENV_BLOCK
+SHELDON_BLOCK
 
             if [[ "$SELECTED_THEME" == "p10k" ]]; then
                 echo ""
@@ -1118,7 +1260,7 @@ OMZ_TPL
             echo "# >>> one-click-dev-env >>>"
             echo ""
 
-            cat << 'ENV_BLOCK'
+            cat << 'ENV_BLOCK1'
 # ── PATH ──
 # zsh 登录 shell 不会 source ~/.profile，需要在此显式设置
 [[ -d "$HOME/.local/bin" ]] && export PATH="$HOME/.local/bin:$PATH"
@@ -1145,9 +1287,34 @@ setopt HIST_FIND_NO_DUPS
 setopt HIST_REDUCE_BLANKS
 setopt SHARE_HISTORY
 setopt APPEND_HISTORY
+ENV_BLOCK1
+
+            # FZF_DEFAULT_OPTS 需要变量展开
+            local fzf_colors
+            fzf_colors="$(get_fzf_catppuccin_colors "$SELECTED_CATPPUCCIN_FLAVOR")"
+            cat << FZF_OPTS
+
+# ── fzf 配色 (Catppuccin ${SELECTED_CATPPUCCIN_FLAVOR}) ──
+export FZF_DEFAULT_OPTS="
+  --height=60% --layout=reverse --border=rounded
+  --color=${fzf_colors}
+  --prompt='❯ ' --pointer='▸' --marker='✓'
+"
+FZF_OPTS
+
+            cat << 'ENV_BLOCK2'
 
 # ── fzf ──
-[[ -f "$HOME/.fzf.zsh" ]] && source "$HOME/.fzf.zsh"
+if [[ -f "$HOME/.fzf.zsh" ]]; then
+  source "$HOME/.fzf.zsh"
+elif (( $+commands[fzf] )); then
+  if [[ -n "$(fzf --zsh 2>/dev/null)" ]]; then
+    source <(fzf --zsh)
+  else
+    [[ -f /usr/share/doc/fzf/examples/key-bindings.zsh ]] && source /usr/share/doc/fzf/examples/key-bindings.zsh
+    [[ -f /usr/share/doc/fzf/examples/completion.zsh ]] && source /usr/share/doc/fzf/examples/completion.zsh
+  fi
+fi
 
 # ── zoxide ──
 (( $+commands[zoxide] )) && eval "$(zoxide init zsh --cmd cd)"
@@ -1177,7 +1344,7 @@ zstyle ':fzf-tab:complete:systemctl-*:*' fzf-preview 'SYSTEMD_COLORS=1 systemctl
 
 # 环境变量预览
 zstyle ':fzf-tab:complete:(-command-|-parameter-|-brace-parameter-|export|unset|expand):*' fzf-preview 'echo ${(P)word}'
-ENV_BLOCK
+ENV_BLOCK2
 
             case "$SELECTED_THEME" in
                 pure)
@@ -1533,6 +1700,12 @@ select_theme() {
         *) SELECTED_THEME="$SELECTED_THEME" ;;
     esac
     success "已选择主题: $SELECTED_THEME"
+
+    # Starship 主题支持 Catppuccin 风味选择
+    if [[ "$SELECTED_THEME" == "starship" ]]; then
+        echo ""
+        select_catppuccin_flavor
+    fi
 }
 
 run_install_all() {
@@ -2031,6 +2204,17 @@ main() {
                     pure)      SELECTED_THEME="pure"; THEME_SET_BY_FLAG=1 ;;
                     p10k)      SELECTED_THEME="p10k"; THEME_SET_BY_FLAG=1 ;;
                     *)         error "无效主题: ${1:-}（可选: starship, p10k, pure）"; exit 1 ;;
+                esac
+                shift
+                ;;
+            --flavor)
+                shift
+                case "${1:-}" in
+                    mocha)      SELECTED_CATPPUCCIN_FLAVOR="mocha" ;;
+                    macchiato)  SELECTED_CATPPUCCIN_FLAVOR="macchiato" ;;
+                    frappe)     SELECTED_CATPPUCCIN_FLAVOR="frappe" ;;
+                    latte)      SELECTED_CATPPUCCIN_FLAVOR="latte" ;;
+                    *)          error "无效风味: ${1:-}（可选: mocha, macchiato, frappe, latte）"; exit 1 ;;
                 esac
                 shift
                 ;;
