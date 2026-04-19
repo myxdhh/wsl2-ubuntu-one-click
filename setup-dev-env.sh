@@ -161,10 +161,23 @@ generate_completions() {
     if command_exists starship; then
         starship completions zsh > "$comp_dir/_starship" 2>>"$LOG_FILE" && generated+=(starship)
     fi
-    # eza（cargo install 不含补全文件，从 GitHub 下载官方补全定义）
-    if command_exists eza && [[ ! -f "$comp_dir/_eza" ]]; then
-        curl -fsSL https://raw.githubusercontent.com/eza-community/eza/main/completions/zsh/_eza \
-            > "$comp_dir/_eza" 2>>"$LOG_FILE" && generated+=(eza)
+    # eza（cargo install 不含补全文件，从 GitHub 下载与当前版本匹配的补全定义）
+    # 注意：必须从对应版本 tag 下载，main 分支可能含未发布的 flag 变更（如 --hyperlink 从布尔变为可传值），
+    # 导致 _arguments 解析别名展开后的参数时错位，补全失败。
+    # 每次安装时重新下载，避免 eza 升级后旧补全文件与新版本不兼容。
+    if command_exists eza; then
+        local eza_ver
+        eza_ver="$(eza --version | grep -oP 'v[\d.]+')"
+        if [[ -n "$eza_ver" ]]; then
+            curl -fsSL "https://raw.githubusercontent.com/eza-community/eza/${eza_ver}/completions/zsh/_eza" \
+                > "$comp_dir/_eza" 2>>"$LOG_FILE" && generated+=(eza)
+            # 若该 tag 不存在则回退到 main
+            if [[ ! -s "$comp_dir/_eza" ]]; then
+                warn "eza ${eza_ver} 的补全文件不存在，回退到 main 分支"
+                curl -fsSL "https://raw.githubusercontent.com/eza-community/eza/main/completions/zsh/_eza" \
+                    > "$comp_dir/_eza" 2>>"$LOG_FILE"
+            fi
+        fi
     fi
 
     # 验证：删除空文件（可能是命令静默失败）
@@ -1231,7 +1244,6 @@ plugins=(git eza fzf-tab zsh-completions zsh-autosuggestions fast-syntax-highlig
 # ── eza 插件配置（需在 source oh-my-zsh.sh 之前）──
 zstyle ':omz:plugins:eza' 'dirs-first' yes
 zstyle ':omz:plugins:eza' 'icons' yes
-zstyle ':omz:plugins:eza' 'hyperlink' yes
 
 source $ZSH/oh-my-zsh.sh
 OMZ_TPL
@@ -1256,7 +1268,7 @@ OMZ_TPL
             sed -i "/^zstyle ':omz:plugins:eza'/d" "$zshrc"
         fi
         # 在 source $ZSH/oh-my-zsh.sh 之前插入 eza zstyle 配置
-        local eza_config="# ── eza 插件配置（需在 source oh-my-zsh.sh 之前）──\nzstyle ':omz:plugins:eza' 'dirs-first' yes\nzstyle ':omz:plugins:eza' 'icons' yes\nzstyle ':omz:plugins:eza' 'hyperlink' yes"
+        local eza_config="# ── eza 插件配置（需在 source oh-my-zsh.sh 之前）──\nzstyle ':omz:plugins:eza' 'dirs-first' yes\nzstyle ':omz:plugins:eza' 'icons' yes"
         if [[ -f "$zshrc" ]] && grep -q "^source.*oh-my-zsh.sh" "$zshrc"; then
             sed -i "/^source.*oh-my-zsh.sh/i\\${eza_config}" "$zshrc"
         fi
@@ -1359,12 +1371,6 @@ zstyle ':fzf-tab:complete:systemctl-*:*' fzf-preview 'SYSTEMD_COLORS=1 systemctl
 # 环境变量预览
 zstyle ':fzf-tab:complete:(-command-|-parameter-|-brace-parameter-|export|unset|expand):*' fzf-preview 'echo ${(P)word}'
 
-# ── eza 别名补全绑定 ──
-# OMZ eza 插件定义的别名需要显式关联 _eza 补全函数
-# 否则 ls -<TAB> 等无法补全 eza 的 flags
-(( $+commands[eza] )) && {
-  compdef ls=eza ll=eza la=eza
-}
 ENV_BLOCK2
 
             case "$SELECTED_THEME" in

@@ -247,3 +247,136 @@ zstyle ':fzf-tab:complete:(cd|__zoxide_z|__zoxide_zi):*' fzf-preview \
 - fzf-tab 在**按 Tab 时**实时查询 zstyle，而非在插件加载时缓存
 - `zstyle ':completion:*'` 放在 OMZ **之后**才能覆盖 `lib/completion.zsh` 的默认值
 - 唯一需要前置的是 `zstyle ':omz:plugins:*'`，因为 OMZ 在初始化时读取这些配置项
+
+## Zsh 补全系统的上下文机制
+
+### 补全位置感知
+
+zsh 的补全函数（如 `_ls`、`_cp`、`_eza`）会根据**光标位置和上下文**判断该补全什么内容：
+
+```
+ls <TAB>          → 补全函数判断在"参数位"   → 提供文件/目录
+ls -<TAB>         → 补全函数判断在"选项位"   → 提供 -l, -a, -h 等 flags
+ls -l <TAB>       → 回到"参数位"            → 提供文件/目录
+cp file.txt <TAB> → 补全函数知道第二参数是目标 → 提供目录
+```
+
+**fzf-tab 是纯 UI 层**，它只接管补全的*显示方式*（从 zsh 原生列表变为 fzf 窗口），不改变"补全什么"。`zstyle fzf-preview` 只影响预览面板内容，不影响候选项是否出现。
+
+### fzf-tab 预览规则的命令分类
+
+| 类别 | 命令 | 预览逻辑 |
+|---|---|---|
+| 导航 | `cd`, `__zoxide_z`, `__zoxide_zi` | 目录→eza 树形 |
+| 列表 | `ls`, `eza`, `exa`, `ll`, `la`, `tree` | 目录→eza 树形，文件→bat |
+| 查看 | `cat`, `less`, `more`, `head`, `tail`, `bat`, `batcat` | 文件→bat 语法高亮 |
+| 编辑 | `vim`, `nvim`, `nano`, `code`, `view` | 文件→bat 语法高亮 |
+| 操作 | `cp`, `mv`, `rm` | 操作前预览=安全保障 |
+| 权限 | `chmod`, `chown`, `stat` | 确认当前状态 |
+| 脚本 | `source`, `.` | source 前确认内容 |
+| 对比 | `file`, `diff` | 文件类型/内容预览 |
+| 进程 | `kill` | `ps` 进程详情 |
+| 服务 | `systemctl-*` | 服务状态 |
+| 变量 | `export`, `unset`, `expand` | 当前变量值 |
+
+### OMZ 下 eza 别名补全失效问题
+
+**现象**：Sheldon 模式 `ls -<TAB>` 正常显示 eza flags，OMZ 模式无补全。
+
+**原因**：zsh 对别名的补全有两种策略：
+- `unsetopt COMPLETE_ALIASES`（默认）：zsh 先展开别名 `ls→eza`，再用 `_eza` 补全
+- `setopt COMPLETE_ALIASES`：zsh 用别名名 `ls` 查找 `_ls` 补全函数
+
+OMZ 的 eza 插件定义了别名但没有设置 `compdef` 来关联补全函数。当 OMZ 的补全初始化时序导致自动展开失败时，需要显式绑定：
+
+```zsh
+# 在 .zshrc 中显式告诉 zsh "这些别名用 _eza 补全"
+compdef ls=eza ll=eza la=eza
+```
+
+### fzf-tab 候选项前的 `·` 前缀
+
+fzf-tab 默认会在每个补全候选项前添加 `·`（中间点 U+00B7）作为视觉分隔符。可通过 zstyle 控制：
+
+```zsh
+# 移除前缀
+zstyle ':fzf-tab:*' prefix ''
+
+# 自定义前缀
+zstyle ':fzf-tab:*' prefix '▸ '
+```
+
+## Zsh 补全问题排查方法
+
+### 诊断步骤
+
+遇到某个命令 `cmd -<TAB>` 无补全时，按以下顺序检查：
+
+```bash
+# 1. 检查是否是别名以及展开结果
+type cmd               # 确认是否是 alias
+alias cmd               # 查看别名内容
+
+# 2. 检查 COMPLETE_ALIASES 选项
+[[ -o COMPLETE_ALIASES ]] && echo "SET" || echo "UNSET"
+# UNSET = zsh 展开别名后再补全（通常更好）
+# SET   = zsh 用别名名本身查找补全函数
+
+# 3. 检查目标命令的补全函数是否存在
+whence -v _target_cmd   # 例如 whence -v _eza
+
+# 4. 直接用目标命令测试（绕过别名）
+target_cmd -<TAB>       # 例如 eza -<TAB>
+
+# 5. 排除 fzf-tab 干扰
+disable-fzf-tab         # 关闭 fzf-tab
+cmd -<TAB>              # 测试原生补全是否工作
+enable-fzf-tab          # 恢复
+
+# 6. 查看补全上下文调试信息
+cmd -<Ctrl+X h>         # 显示哪个补全函数被调用
+
+# 7. 强制绑定补全函数
+compdef cmd=target_cmd  # 例如 compdef ls=eza
+```
+
+### 常见原因
+
+| 现象 | 原因 | 修复 |
+|---|---|---|
+| 别名补全不工作，原命令补全正常 | 别名展开后上下文丢失 | `compdef alias=cmd` |
+| `compdef` 后依然不行 | fzf-tab 干扰 | `disable-fzf-tab` 测试 |
+| 原生补全也不行 | 补全函数未加载 | 检查 fpath 和 `_cmd` 文件 |
+| 补全函数存在但不工作 | compinit 缓存过期 | `rm -f ~/.zcompdump*; exec zsh` |
+| `compdef` + 无 fzf-tab 也不行 | 别名展开后 `_arguments` 解析错位 | 排查别名中的问题 flag |
+
+### 实例：OMZ 下 `ls -<TAB>` 无补全（Sheldon 正常）
+
+**现象**：Sheldon 和 OMZ 使用同一个 eza 二进制（v0.23.4），但只有 OMZ 的 `ls -<TAB>` 无补全。
+
+**根因：`_eza` 补全文件与安装版本不匹配**
+
+我们通过 `cargo install eza` 安装的是 v0.23.4，但 `_eza` 补全文件从 `main` 分支（未发布版本）下载。main 分支已将 `--hyperlink` 改为接受值（`--hyperlink=WHEN`），但 v0.23.4 中 `--hyperlink` 是纯布尔 flag：
+
+```bash
+❯ eza --hyperlink=auto
+eza: Flag --hyperlink cannot take a value   # v0.23.4: 布尔 flag
+```
+
+OMZ eza 插件在 `zstyle 'hyperlink' yes` 时将 `--hyperlink` 加入别名。别名展开后，`_arguments` 按 main 分支的 spec 认为 `--hyperlink` 需要值，贪婪消费下一个 token（`-`），补全失败。
+
+Sheldon 的别名不含 `--hyperlink`（由本脚本自行定义），因此不触发。
+
+**修复**：从安装版本对应的 tag 下载 `_eza`，而非 `main` 分支：
+
+```bash
+eza_ver="$(eza --version | head -1 | grep -oP 'v[\d.]+')"
+curl -fsSL "https://raw.githubusercontent.com/eza-community/eza/${eza_ver}/completions/zsh/_eza"
+# 回退: tag 不存在时用 main
+```
+
+> **教训**：补全文件必须与安装版本匹配。从 `main` 分支下载的补全定义可能包含未发布的 flag 变更，导致 `_arguments` 解析已有参数时错位。
+
+
+
+
