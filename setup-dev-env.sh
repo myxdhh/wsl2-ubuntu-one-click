@@ -131,25 +131,51 @@ generate_completions() {
     fi
     mkdir -p "$comp_dir"
 
+    local generated=()
+
     # rustup + cargo
     if command_exists rustup; then
-        rustup completions zsh > "$comp_dir/_rustup" 2>/dev/null
-        rustup completions zsh cargo > "$comp_dir/_cargo" 2>/dev/null
+        rustup completions zsh > "$comp_dir/_rustup" 2>>"$LOG_FILE" && generated+=(rustup)
+        rustup completions zsh cargo > "$comp_dir/_cargo" 2>>"$LOG_FILE" && generated+=(cargo)
     fi
-    # volta
+    # volta（使用 -o 参数直接写入文件，比 stdout 重定向更可靠）
     if command_exists volta; then
-        volta completions zsh > "$comp_dir/_volta" 2>/dev/null
+        volta completions zsh -o "$comp_dir/_volta" 2>>"$LOG_FILE" && generated+=(volta)
     fi
     # uv
     if command_exists uv; then
-        uv generate-shell-completion zsh > "$comp_dir/_uv" 2>/dev/null
+        uv generate-shell-completion zsh > "$comp_dir/_uv" 2>>"$LOG_FILE" && generated+=(uv)
     fi
     # proto
     if command_exists proto; then
-        proto completions --shell zsh > "$comp_dir/_proto" 2>/dev/null
+        proto completions --shell zsh > "$comp_dir/_proto" 2>>"$LOG_FILE" && generated+=(proto)
+    fi
+    # starship
+    if command_exists starship; then
+        starship completions zsh > "$comp_dir/_starship" 2>>"$LOG_FILE" && generated+=(starship)
+    fi
+    # eza（cargo install 不含补全文件，从 GitHub 下载官方补全定义）
+    if command_exists eza && [[ ! -f "$comp_dir/_eza" ]]; then
+        curl -fsSL https://raw.githubusercontent.com/eza-community/eza/main/completions/zsh/_eza \
+            > "$comp_dir/_eza" 2>>"$LOG_FILE" && generated+=(eza)
     fi
 
-    info "补全文件已生成到: $comp_dir"
+    # 验证：删除空文件（可能是命令静默失败）
+    local f basename
+    for f in "$comp_dir"/_*; do
+        [[ -f "$f" ]] || continue
+        if [[ ! -s "$f" ]]; then
+            basename="$(basename "$f")"
+            warn "补全文件为空，已删除: $basename（请检查日志 $LOG_FILE）"
+            rm -f "$f"
+        fi
+    done
+
+    if [[ ${#generated[@]} -gt 0 ]]; then
+        info "补全文件已生成到: $comp_dir (${generated[*]})"
+    else
+        info "未检测到可生成补全的工具"
+    fi
 }
 
 check_os() {
@@ -816,24 +842,36 @@ apply = ["fpath"]
 COMPLETIONS_BLOCK
 
     # compinit（初始化补全系统，必须在 fzf-tab 之前）
-    # 按日期判断缓存：当天使用 -C 快速加载，否则全量重建
+    # 不使用 compinit -C（跳过扫描），因为 /etc/zsh/zshrc 等可能提前创建了
+    # 不含自定义补全的 .zcompdump，导致 -C 永远使用残缺缓存
     cat >> "$plugins_toml" << 'COMPINIT_BLOCK'
 [plugins.compinit]
 inline = '''
-autoload -Uz compinit
-if [[ -f "$HOME/.zcompdump" ]] && [[ $(date +'%j') == $(date -r "$HOME/.zcompdump" +'%j' 2>/dev/null) ]]; then
-  compinit -C
-else
-  compinit
-fi
+autoload -Uz compinit && compinit
 '''
 
 COMPINIT_BLOCK
 
-    # 插件（顺序：fzf-tab → ohmyzsh-git → autosuggestions → syntax-highlighting）
+    # 插件（顺序：fzf-tab → completion-styles → ohmyzsh-git → autosuggestions → syntax-highlighting）
     cat >> "$plugins_toml" << 'PLUGINS_BLOCK'
 [plugins.fzf-tab]
 github = "Aloxaf/fzf-tab"
+
+[plugins.completion-styles]
+inline = '''
+# 补全系统美化
+zstyle ':completion:*' menu select
+zstyle ':completion:*' special-dirs true
+zstyle ':completion:*' group-name ''
+zstyle ':completion:*:descriptions' format '[%d]'
+zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}"
+zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
+
+# fzf-tab: cd 时预览目录内容（eza 优先，ls 兜底）
+zstyle ':fzf-tab:complete:cd:*' fzf-preview 'eza -1 --color=always $realpath 2>/dev/null || ls -1 --color=always $realpath'
+# fzf-tab: 环境变量预览
+zstyle ':fzf-tab:complete:(-command-|-parameter-|-brace-parameter-|export|unset|expand):*' fzf-preview 'echo ${(P)word}'
+'''
 
 [plugins.ohmyzsh-git]
 github = "ohmyzsh/ohmyzsh"
@@ -1101,6 +1139,20 @@ setopt APPEND_HISTORY
 
 # ── zoxide ──
 (( $+commands[zoxide] )) && eval "$(zoxide init zsh --cmd cd)"
+
+# ── 补全系统美化 ──
+zstyle ':completion:*' menu select
+zstyle ':completion:*' special-dirs true
+zstyle ':completion:*' group-name ''
+zstyle ':completion:*:descriptions' format '[%d]'
+zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}"
+zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
+
+# ── fzf-tab 预览 ──
+# cd 时预览目录内容（eza 优先，ls 兜底）
+zstyle ':fzf-tab:complete:cd:*' fzf-preview 'eza -1 --color=always $realpath 2>/dev/null || ls -1 --color=always $realpath'
+# 环境变量预览
+zstyle ':fzf-tab:complete:(-command-|-parameter-|-brace-parameter-|export|unset|expand):*' fzf-preview 'echo ${(P)word}'
 ENV_BLOCK
 
             case "$SELECTED_THEME" in
