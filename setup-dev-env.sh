@@ -991,10 +991,9 @@ zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
 # fzf-tab: 候选项少时保持足够的预览空间
 zstyle ':fzf-tab:*' fzf-min-height 15
 
-# fzf-tab: 文件/目录预览（cd、编辑器、查看器统一处理）
+# fzf-tab: 文件/目录预览（导航、查看、编辑、列表、操作类命令统一处理）
 # 目录 → eza 树形结构（嵌套 2 层），文件 → bat 语法高亮预览
-# cd/__zoxide_z 只补全目录，文件分支不会触发
-zstyle ':fzf-tab:complete:(cd|__zoxide_z|__zoxide_zi|cat|less|more|head|tail|bat|batcat|vim|nvim|nano|code|view):*' fzf-preview '[[ -d $realpath ]] && { eza --tree --level=2 --icons --color=always --group-directories-first $realpath 2>/dev/null || ls -1 --color=always $realpath; } || { [[ -f $realpath ]] && { batcat --color=always --style=numbers --line-range=:200 $realpath 2>/dev/null || bat --color=always --style=numbers --line-range=:200 $realpath 2>/dev/null || head -100 $realpath; }; }'
+zstyle ':fzf-tab:complete:(cd|__zoxide_z|__zoxide_zi|ls|eza|exa|ll|la|tree|cat|less|more|head|tail|bat|batcat|vim|nvim|nano|code|view|cp|mv|rm|chmod|chown|source|\.|file|diff|stat):*' fzf-preview '[[ -d $realpath ]] && { eza --tree --level=2 --icons --color=always --group-directories-first $realpath 2>/dev/null || ls -1 --color=always $realpath; } || { [[ -f $realpath ]] && { batcat --color=always --style=numbers --line-range=:200 $realpath 2>/dev/null || bat --color=always --style=numbers --line-range=:200 $realpath 2>/dev/null || head -100 $realpath; }; }'
 
 # fzf-tab: kill 进程预览
 zstyle ':fzf-tab:complete:kill:argument-rest' fzf-preview 'ps -p $word -o pid,user,%cpu,%mem,start,command --no-headers 2>/dev/null'
@@ -1169,8 +1168,13 @@ setopt APPEND_HISTORY
 ENV_BLOCK
 
             # FZF_DEFAULT_OPTS 需要变量展开，不能放在单引号 heredoc 中
-            local fzf_colors
+            local fzf_colors bat_theme
             fzf_colors="$(get_fzf_catppuccin_colors "$SELECTED_CATPPUCCIN_FLAVOR")"
+            if [[ "$SELECTED_CATPPUCCIN_FLAVOR" == "latte" ]]; then
+                bat_theme="GitHub"
+            else
+                bat_theme="Monokai Extended"
+            fi
             cat << FZF_OPTS
 
 # ── fzf 配色 (Catppuccin ${SELECTED_CATPPUCCIN_FLAVOR}) ──
@@ -1179,6 +1183,9 @@ export FZF_DEFAULT_OPTS="
   --color=${fzf_colors}
   --prompt='❯ ' --pointer='▸' --marker='✓'
 "
+
+# ── bat 主题 (Catppuccin ${SELECTED_CATPPUCCIN_FLAVOR}) ──
+export BAT_THEME="${bat_theme}"
 FZF_OPTS
 
             cat << 'SHELDON_BLOCK'
@@ -1290,8 +1297,13 @@ setopt APPEND_HISTORY
 ENV_BLOCK1
 
             # FZF_DEFAULT_OPTS 需要变量展开
-            local fzf_colors
+            local fzf_colors bat_theme
             fzf_colors="$(get_fzf_catppuccin_colors "$SELECTED_CATPPUCCIN_FLAVOR")"
+            if [[ "$SELECTED_CATPPUCCIN_FLAVOR" == "latte" ]]; then
+                bat_theme="GitHub"
+            else
+                bat_theme="Monokai Extended"
+            fi
             cat << FZF_OPTS
 
 # ── fzf 配色 (Catppuccin ${SELECTED_CATPPUCCIN_FLAVOR}) ──
@@ -1300,6 +1312,9 @@ export FZF_DEFAULT_OPTS="
   --color=${fzf_colors}
   --prompt='❯ ' --pointer='▸' --marker='✓'
 "
+
+# ── bat 主题 (Catppuccin ${SELECTED_CATPPUCCIN_FLAVOR}) ──
+export BAT_THEME="${bat_theme}"
 FZF_OPTS
 
             cat << 'ENV_BLOCK2'
@@ -1331,10 +1346,9 @@ zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
 # 候选项少时保持足够的预览空间
 zstyle ':fzf-tab:*' fzf-min-height 15
 
-# 文件/目录预览（cd、编辑器、查看器统一处理）
+# 文件/目录预览（导航、查看、编辑、列表、操作类命令统一处理）
 # 目录 → eza 树形结构（嵌套 2 层），文件 → bat 语法高亮预览
-# cd/__zoxide_z 只补全目录，文件分支不会触发
-zstyle ':fzf-tab:complete:(cd|__zoxide_z|__zoxide_zi|cat|less|more|head|tail|bat|batcat|vim|nvim|nano|code|view):*' fzf-preview '[[ -d $realpath ]] && { eza --tree --level=2 --icons --color=always --group-directories-first $realpath 2>/dev/null || ls -1 --color=always $realpath; } || { [[ -f $realpath ]] && { batcat --color=always --style=numbers --line-range=:200 $realpath 2>/dev/null || bat --color=always --style=numbers --line-range=:200 $realpath 2>/dev/null || head -100 $realpath; }; }'
+zstyle ':fzf-tab:complete:(cd|__zoxide_z|__zoxide_zi|ls|eza|exa|ll|la|tree|cat|less|more|head|tail|bat|batcat|vim|nvim|nano|code|view|cp|mv|rm|chmod|chown|source|\.|file|diff|stat):*' fzf-preview '[[ -d $realpath ]] && { eza --tree --level=2 --icons --color=always --group-directories-first $realpath 2>/dev/null || ls -1 --color=always $realpath; } || { [[ -f $realpath ]] && { batcat --color=always --style=numbers --line-range=:200 $realpath 2>/dev/null || bat --color=always --style=numbers --line-range=:200 $realpath 2>/dev/null || head -100 $realpath; }; }'
 
 # kill 进程预览
 zstyle ':fzf-tab:complete:kill:argument-rest' fzf-preview 'ps -p $word -o pid,user,%cpu,%mem,start,command --no-headers 2>/dev/null'
@@ -1344,6 +1358,13 @@ zstyle ':fzf-tab:complete:systemctl-*:*' fzf-preview 'SYSTEMD_COLORS=1 systemctl
 
 # 环境变量预览
 zstyle ':fzf-tab:complete:(-command-|-parameter-|-brace-parameter-|export|unset|expand):*' fzf-preview 'echo ${(P)word}'
+
+# ── eza 别名补全绑定 ──
+# OMZ eza 插件定义的别名需要显式关联 _eza 补全函数
+# 否则 ls -<TAB> 等无法补全 eza 的 flags
+(( $+commands[eza] )) && {
+  compdef ls=eza ll=eza la=eza
+}
 ENV_BLOCK2
 
             case "$SELECTED_THEME" in
