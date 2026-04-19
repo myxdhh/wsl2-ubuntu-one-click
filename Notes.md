@@ -199,3 +199,51 @@ trdx:!:20561:0:99999
 2. **方案 B**：通过 PowerShell 先将 bash 脚本写入 WSL 文件系统，再执行该脚本文件（避免 `bash -c` 的引号地狱）
 3. **方案 C**：研究 `[Console]::OutputEncoding` 和 `$OutputEncoding` 对 wsl.exe stdin 的影响，找到正确的编码设置
 
+## fzf-tab 预览在 cd + Tab 时不生效
+
+### 问题现象
+
+配置了 `zstyle ':fzf-tab:complete:cd:*' fzf-preview ...`，但 `cd` + Tab 只显示左侧补全列表，没有右侧预览面板。Sheldon 和 Oh My Zsh 两种模式都有此问题。
+
+### 排查过程
+
+1. **确认 zstyle 已生效**：`zstyle -L ':fzf-tab:*'` 输出正确 ✅
+2. **确认 fzf 支持预览**：`echo test | fzf --preview 'echo hello'` 有右侧面板 ✅
+3. **确认终端尺寸足够**：180x44 ✅
+4. **确认 eza 可用**：`eza -1 --color=always /tmp` 正常输出 ✅
+5. **通配符测试**：`zstyle ':fzf-tab:complete:*' fzf-preview 'echo $realpath'` → 预览出现 ✅
+6. **cd 专用上下文**：`':fzf-tab:complete:cd:*'` → 预览不出现 ❌
+
+通配符匹配有效但 `cd` 专用模式无效 → **上下文名称不是 `cd`**。
+
+```bash
+❯ type cd
+cd is an alias for __zoxide_z
+```
+
+### 根因
+
+`zoxide init zsh --cmd cd` 会将 `cd` alias 到 `__zoxide_z`。fzf-tab 使用 `$words[1]`（命令行第一个词的实际解析结果）作为补全上下文中的命令名。由于 `cd` 实际是 `__zoxide_z` 的 alias，fzf-tab 的上下文变成了 `:fzf-tab:complete:__zoxide_z:*`，与 `:fzf-tab:complete:cd:*` 不匹配。
+
+### 修复
+
+使用 zstyle 模式的 alternation 语法同时匹配三种情况：
+
+```bash
+# 匹配原生 cd、zoxide 的 __zoxide_z 和交互模式 __zoxide_zi
+zstyle ':fzf-tab:complete:(cd|__zoxide_z|__zoxide_zi):*' fzf-preview \
+  'eza -1 --color=always --icons --group-directories-first $realpath 2>/dev/null || ls -1 --color=always $realpath'
+```
+
+### 教训
+
+**任何通过 alias/function 替换原生命令的工具（zoxide、thefuck 等），都会改变 fzf-tab 的补全上下文名称。** 配置 fzf-tab 的 zstyle 时必须用实际的命令名，而非用户输入的 alias 名。
+
+### 附：关于 zstyle 与 OMZ 加载顺序的误解
+
+网上有说法称"zstyle 必须放在 `source oh-my-zsh.sh` 之前才能被 fzf-tab 读取"——这是**错误**的。
+
+- `zstyle` 是全局注册表，**相同模式最后一次写入胜出**
+- fzf-tab 在**按 Tab 时**实时查询 zstyle，而非在插件加载时缓存
+- `zstyle ':completion:*'` 放在 OMZ **之后**才能覆盖 `lib/completion.zsh` 的默认值
+- 唯一需要前置的是 `zstyle ':omz:plugins:*'`，因为 OMZ 在初始化时读取这些配置项

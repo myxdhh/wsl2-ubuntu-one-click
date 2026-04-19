@@ -869,7 +869,8 @@ zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}"
 zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
 
 # fzf-tab: cd 时预览目录内容（eza 优先，ls 兜底）
-zstyle ':fzf-tab:complete:cd:*' fzf-preview 'eza -1 --color=always $realpath 2>/dev/null || ls -1 --color=always $realpath'
+# 同时匹配 zoxide 的 __zoxide_z（--cmd cd 会将 cd alias 到 __zoxide_z）
+zstyle ':fzf-tab:complete:(cd|__zoxide_z|__zoxide_zi):*' fzf-preview 'eza -1 --color=always --icons --group-directories-first $realpath 2>/dev/null || ls -1 --color=always $realpath'
 # fzf-tab: 环境变量预览
 zstyle ':fzf-tab:complete:(-command-|-parameter-|-brace-parameter-|export|unset|expand):*' fzf-preview 'echo ${(P)word}'
 '''
@@ -1151,7 +1152,8 @@ zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
 
 # ── fzf-tab 预览 ──
 # cd 时预览目录内容（eza 优先，ls 兜底）
-zstyle ':fzf-tab:complete:cd:*' fzf-preview 'eza -1 --color=always $realpath 2>/dev/null || ls -1 --color=always $realpath'
+# 同时匹配 zoxide 的 __zoxide_z（--cmd cd 会将 cd alias 到 __zoxide_z）
+zstyle ':fzf-tab:complete:(cd|__zoxide_z|__zoxide_zi):*' fzf-preview 'eza -1 --color=always --icons --group-directories-first $realpath 2>/dev/null || ls -1 --color=always $realpath'
 # 环境变量预览
 zstyle ':fzf-tab:complete:(-command-|-parameter-|-brace-parameter-|export|unset|expand):*' fzf-preview 'echo ${(P)word}'
 ENV_BLOCK
