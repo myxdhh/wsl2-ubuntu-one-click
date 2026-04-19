@@ -1003,19 +1003,26 @@ zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
 
 # fzf-tab: 候选项少时保持足够的预览空间
 zstyle ':fzf-tab:*' fzf-min-height 15
+# 预览窗口自动换行（fzf 不支持横向滚动）
+zstyle ':fzf-tab:*' fzf-flags --preview-window=wrap
 
 # fzf-tab: 文件/目录预览（导航、查看、编辑、列表、操作类命令统一处理）
 # 目录 → eza 树形结构（嵌套 2 层），文件 → bat 语法高亮预览
 zstyle ':fzf-tab:complete:(cd|__zoxide_z|__zoxide_zi|ls|eza|exa|ll|la|tree|cat|less|more|head|tail|bat|batcat|vim|nvim|nano|code|view|cp|mv|rm|chmod|chown|source|\.|file|diff|stat):*' fzf-preview '[[ -d $realpath ]] && { eza --tree --level=2 --icons --color=always --group-directories-first $realpath 2>/dev/null || ls -1 --color=always $realpath; } || { [[ -f $realpath ]] && { batcat --color=always --style=numbers --line-range=:200 $realpath 2>/dev/null || bat --color=always --style=numbers --line-range=:200 $realpath 2>/dev/null || head -100 $realpath; }; }'
+# 如果希望所有命令都有预览（包括 flags/子命令显示 $desc 描述），取消注释下面一行并注释上面的白名单规则：
+# zstyle ':fzf-tab:complete:*:*' fzf-preview 'if [[ -d $realpath ]]; then eza --tree --level=2 --icons --color=always --group-directories-first $realpath 2>/dev/null || ls -1 --color=always $realpath; elif [[ -f $realpath ]]; then batcat --color=always --style=numbers --line-range=:200 $realpath 2>/dev/null || bat --color=always --style=numbers --line-range=:200 $realpath 2>/dev/null || head -100 $realpath; elif [[ -n $desc ]]; then echo -E $desc; fi'
 
 # fzf-tab: kill 进程预览
 zstyle ':fzf-tab:complete:kill:argument-rest' fzf-preview 'ps -p $word -o pid,user,%cpu,%mem,start,command --no-headers 2>/dev/null'
-
 # fzf-tab: systemctl 服务状态预览
 zstyle ':fzf-tab:complete:systemctl-*:*' fzf-preview 'SYSTEMD_COLORS=1 systemctl status $word 2>/dev/null'
-
 # fzf-tab: 环境变量预览
 zstyle ':fzf-tab:complete:(-command-|-parameter-|-brace-parameter-|export|unset|expand):*' fzf-preview 'echo ${(P)word}'
+
+# fzf-tab: 自定义命令预览示例（取消注释即可启用）
+# 对于支持 `cmd help subcommand` 的工具（如 rustup、cargo、docker），
+# 可以覆盖通用规则，实现更丰富的子命令帮助预览
+# zstyle ':fzf-tab:complete:rustup:*' fzf-preview 'if [[ -d $realpath ]]; then eza --tree --level=2 --icons --color=always --group-directories-first $realpath 2>/dev/null; elif [[ -f $realpath ]]; then batcat --color=always --style=numbers --line-range=:200 $realpath 2>/dev/null; else rustup help $word 2>/dev/null; fi'
 '''
 
 [plugins.ohmyzsh-git]
@@ -1357,19 +1364,26 @@ zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
 # ── fzf-tab 配置 ──
 # 候选项少时保持足够的预览空间
 zstyle ':fzf-tab:*' fzf-min-height 15
+# 预览窗口自动换行（fzf 不支持横向滚动）
+zstyle ':fzf-tab:*' fzf-flags --preview-window=wrap
 
 # 文件/目录预览（导航、查看、编辑、列表、操作类命令统一处理）
 # 目录 → eza 树形结构（嵌套 2 层），文件 → bat 语法高亮预览
 zstyle ':fzf-tab:complete:(cd|__zoxide_z|__zoxide_zi|ls|eza|exa|ll|la|tree|cat|less|more|head|tail|bat|batcat|vim|nvim|nano|code|view|cp|mv|rm|chmod|chown|source|\.|file|diff|stat):*' fzf-preview '[[ -d $realpath ]] && { eza --tree --level=2 --icons --color=always --group-directories-first $realpath 2>/dev/null || ls -1 --color=always $realpath; } || { [[ -f $realpath ]] && { batcat --color=always --style=numbers --line-range=:200 $realpath 2>/dev/null || bat --color=always --style=numbers --line-range=:200 $realpath 2>/dev/null || head -100 $realpath; }; }'
+# 如果希望所有命令都有预览（包括 flags/子命令显示 $desc 描述），取消注释下面一行并注释上面的白名单规则：
+# zstyle ':fzf-tab:complete:*:*' fzf-preview 'if [[ -d $realpath ]]; then eza --tree --level=2 --icons --color=always --group-directories-first $realpath 2>/dev/null || ls -1 --color=always $realpath; elif [[ -f $realpath ]]; then batcat --color=always --style=numbers --line-range=:200 $realpath 2>/dev/null || bat --color=always --style=numbers --line-range=:200 $realpath 2>/dev/null || head -100 $realpath; elif [[ -n $desc ]]; then echo -E $desc; fi'
 
 # kill 进程预览
 zstyle ':fzf-tab:complete:kill:argument-rest' fzf-preview 'ps -p $word -o pid,user,%cpu,%mem,start,command --no-headers 2>/dev/null'
-
 # systemctl 服务状态预览
 zstyle ':fzf-tab:complete:systemctl-*:*' fzf-preview 'SYSTEMD_COLORS=1 systemctl status $word 2>/dev/null'
-
 # 环境变量预览
 zstyle ':fzf-tab:complete:(-command-|-parameter-|-brace-parameter-|export|unset|expand):*' fzf-preview 'echo ${(P)word}'
+
+# 自定义命令预览示例（取消注释即可启用）
+# 对于支持 `cmd help subcommand` 的工具（如 rustup、cargo、docker），
+# 可以覆盖通用规则，实现更丰富的子命令帮助预览
+# zstyle ':fzf-tab:complete:rustup:*' fzf-preview 'if [[ -d $realpath ]]; then eza --tree --level=2 --icons --color=always --group-directories-first $realpath 2>/dev/null; elif [[ -f $realpath ]]; then batcat --color=always --style=numbers --line-range=:200 $realpath 2>/dev/null; else rustup help $word 2>/dev/null; fi'
 
 ENV_BLOCK2
 

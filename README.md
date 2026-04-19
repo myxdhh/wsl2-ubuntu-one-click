@@ -178,6 +178,53 @@ your-cli completions zsh > ~/.oh-my-zsh/completions/_your-cli
 omz reload
 ```
 
+## 自定义 fzf-tab 预览
+
+脚本已为**常用文件操作命令**（`cd`、`ls`、`cat`、`vim`、`cp`、`mv`、`rm` 等）配置了 Tab 补全预览：
+
+| 候选项类型 | 预览内容 |
+|---|---|
+| 目录 | eza 树形结构（嵌套 2 层） |
+| 文件 | bat 语法高亮 |
+
+此外，`kill`（进程状态）、`systemctl`（服务状态）、环境变量（变量值）已有专属预览规则。
+
+> [!TIP]
+> 脚本中还提供了一条**注释掉的通用规则**（`*:*`），取消注释即可让所有命令的文件/目录补全都有预览，并为 flags/子命令显示 `$desc` 描述文本。代价是：纯子命令/flags 场景下预览面板仍会显示（内容为空），占用屏幕空间。
+
+### 为特定命令添加更丰富的预览
+
+对于支持 `cmd help subcommand` 的工具，可以添加特定规则，在预览窗口中显示完整的帮助信息：
+
+```zsh
+# rustup: 路径→目录/文件预览，子命令→完整帮助文本
+zstyle ':fzf-tab:complete:rustup:*' fzf-preview \
+  'if [[ -d $realpath ]]; then
+    eza --tree --level=2 --icons --color=always --group-directories-first $realpath 2>/dev/null
+  elif [[ -f $realpath ]]; then
+    batcat --color=always --style=numbers --line-range=:200 $realpath 2>/dev/null
+  else
+    rustup help $word 2>/dev/null
+  fi'
+```
+
+> [!TIP]
+> **可用变量**：
+> - `$realpath`：候选项的真实路径（文件/目录补全时有效）
+> - `$word`：候选项的文本内容（如子命令名称）
+> - `$desc`：补全函数对该候选项的描述
+>
+> **帮助命令格式**：
+> - `cmd help subcommand`：rustup、cargo、docker、git 等 Go/Rust CLI 工具
+> - `cmd subcommand --help`：npm、pnpm 等 Node.js 系工具，需调整命令格式
+
+> [!IMPORTANT]
+> **多级子命令的限制**：
+> fzf-tab 的预览环境中**无法获取完整的命令链**。例如输入 `git remote <TAB>` 时，预览只知道当前候选词 `$word` 是 `add`，但**不知道前面是 `git remote`**，因此无法自动构造 `git remote help add` 或 `git help remote add` 这样的多级帮助命令。
+>
+> 对于一级子命令（如 `rustup <TAB>` → `rustup help install`），特定规则可以正常工作。
+> 对于多级子命令，建议使用通用规则的 `$desc` 描述文本作为 fallback。
+
 ## 注意事项
 
 - `setup-wsl.ps1` 需要 **管理员权限** 运行

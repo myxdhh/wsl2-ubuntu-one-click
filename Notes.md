@@ -377,6 +377,26 @@ curl -fsSL "https://raw.githubusercontent.com/eza-community/eza/${eza_ver}/compl
 
 > **教训**：补全文件必须与安装版本匹配。从 `main` 分支下载的补全定义可能包含未发布的 flag 变更，导致 `_arguments` 解析已有参数时错位。
 
+### fzf-tab 候选项前的 `·`（中间点）
+
+**现象**：`git <TAB>` 的子命令前有 `·`（如 `·add`、`·branch`），但 `ls <TAB>` 的文件名前没有。
+
+**原因**：`·` 是 fzf-tab 的 **`prefix`**（默认 `·`），官方定义为 "A prefix to indicate the color"——即分组颜色指示器。
+
+显示规则：
+- **多分组**（如 git 的 porcelain/plumbing）：`·` 自动着色为对应 `group-colors`，帮助区分分组
+- **单分组或无分组**（如文件列表）：由 `single-group` 控制，默认 `color header`（不含 `prefix`），不显示 `·`
+- **前提条件**：需配置 `zstyle ':completion:*:descriptions' format '[%d]'`，否则 prefix 自动清空
+
+配置：
+```zsh
+zstyle ':fzf-tab:*' prefix ''      # 去掉
+zstyle ':fzf-tab:*' prefix '▸ '    # 换符号
+# 单分组也显示 prefix：
+zstyle ':fzf-tab:*' single-group prefix color header
+```
+
+
 
 
 
