@@ -570,18 +570,15 @@ function Step-ConfigureWslconfig {
 
     $wslconfigPath = Join-Path $env:USERPROFILE ".wslconfig"
 
-    # 读取现有配置
+    # 读取现有配置（保存原始内容用于后续变更检测）
+    $existingRawContent = $null
     if (Test-Path $wslconfigPath) {
+        $existingRawContent = ((Get-Content $wslconfigPath -Raw) -replace "`r`n", "`n").TrimEnd("`n")
         Write-Info "已检测到现有 .wslconfig"
         Write-Host ""
         Write-Host "当前内容：" -ForegroundColor DarkGray
         Get-Content $wslconfigPath | ForEach-Object { Write-Host "  $_" -ForegroundColor DarkGray }
         Write-Host ""
-
-        # 备份现有文件
-        $backupPath = "$wslconfigPath.bak.$(Get-Date -Format 'yyyyMMddHHmmss')"
-        Copy-Item $wslconfigPath $backupPath
-        Write-Info "已备份到: $backupPath"
     }
 
     Write-Info "请逐项选择以下 5 项配置（直接回车采用 ★默认值）："
@@ -701,6 +698,23 @@ function Step-ConfigureWslconfig {
     }
     $wslconfigContent = ($lines -join "`n").TrimEnd("`n")
 
+    # 检测是否有实际变更（避免不必要的 --shutdown 影响其他运行中的实例）
+    if ($existingRawContent -and $wslconfigContent -eq $existingRawContent) {
+        Write-Ok ".wslconfig 配置无变化，无需写入"
+        Write-Host ""
+        Write-Host "当前配置（未变更）：" -ForegroundColor DarkGray
+        Write-Host $wslconfigContent
+        Write-Host ""
+        return $false
+    }
+
+    # 有变更时才备份现有文件
+    if ($existingRawContent -and (Test-Path $wslconfigPath)) {
+        $backupPath = "$wslconfigPath.bak.$(Get-Date -Format 'yyyyMMddHHmmss')"
+        Copy-Item $wslconfigPath $backupPath
+        Write-Info "已备份到: $backupPath"
+    }
+
     # 写入文件（使用 UTF8NoBOM，避免 BOM 影响 WSL 读取）
     [System.IO.File]::WriteAllText($wslconfigPath, $wslconfigContent, [System.Text.UTF8Encoding]::new($false))
     Write-Ok ".wslconfig 已写入: $wslconfigPath"
@@ -709,6 +723,7 @@ function Step-ConfigureWslconfig {
     Write-Host "最终配置：" -ForegroundColor Cyan
     Write-Host $wslconfigContent
     Write-Host ""
+    return $true
 }
 
 # =============================================================================
@@ -1127,7 +1142,7 @@ function Main {
     $instanceName = Step-InstallDistro
 
     # 步骤 2: 配置 .wslconfig
-    Step-ConfigureWslconfig
+    $wslconfigChanged = Step-ConfigureWslconfig
 
     # 步骤 3: 创建用户
     $username = Step-CreateUser -InstanceName $instanceName
@@ -1146,10 +1161,19 @@ function Main {
     # 步骤 6: 选择组件
     $components = Step-SelectComponents -PluginMgr $pluginMgr -Theme $theme
 
-    # 关闭 WSL 使 .wslconfig + wsl.conf 生效
-    Write-Info "正在重启 WSL 以应用配置..."
-    wsl --shutdown
-    Start-Sleep -Seconds 3
+    # 重启 WSL 使配置生效
+    # .wslconfig 是全局配置（影响整个 WSL2 VM），变更后必须 --shutdown 关闭所有实例
+    # wsl.conf 是分发版级配置，只需 --terminate 目标实例即可生效
+    if ($wslconfigChanged) {
+        Write-Warn ".wslconfig 已变更，需要关闭所有 WSL 实例以使全局配置生效"
+        Write-Info "正在关闭所有 WSL 实例..."
+        wsl --shutdown
+        Start-Sleep -Seconds 3
+    } else {
+        Write-Info ".wslconfig 无变更，仅重启 $instanceName 以应用 wsl.conf 配置..."
+        wsl --terminate $instanceName
+        Start-Sleep -Seconds 2
+    }
 
     # 步骤 7: 执行开发环境脚本
     Step-RunDevEnvScript -InstanceName $instanceName -Username $username -PluginMgr $pluginMgr -Theme $theme -Flavor $flavor -Components $components
