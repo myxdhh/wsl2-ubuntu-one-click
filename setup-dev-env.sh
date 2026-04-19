@@ -992,6 +992,7 @@ setopt SHARE_HISTORY
 setopt APPEND_HISTORY
 
 # ── Sheldon (Plugin Manager) ──
+# 配置文件: ~/.config/sheldon/plugins.toml
 eval "$(sheldon source)"
 ENV_BLOCK
 
@@ -1005,6 +1006,7 @@ P10K_CONFIG
                 echo ""
                 cat << 'STARSHIP_INIT'
 # ── Starship Prompt ──
+# 配置文件: ~/.config/starship.toml
 eval "$(starship init zsh)"
 STARSHIP_INIT
             fi
@@ -1117,6 +1119,7 @@ PURE_BLOCK
                     echo ""
                     cat << 'STARSHIP_BLOCK'
 # ── Starship Prompt ──
+# 配置文件: ~/.config/starship.toml
 eval "$(starship init zsh)"
 STARSHIP_BLOCK
                     ;;
