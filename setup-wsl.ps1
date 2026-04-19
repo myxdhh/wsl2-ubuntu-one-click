@@ -453,10 +453,18 @@ function Step-InstallDistro {
     $existingDistros = (wsl --list --quiet 2>$null) | ForEach-Object { $_.Trim().Replace("`0", "") } | Where-Object { $_ -ne "" }
     if ($existingDistros -and ($existingDistros -contains $instanceName)) {
         Write-Warn "已存在同名实例: $instanceName"
-        if (-not (Confirm-Action "是否继续安装（会覆盖现有实例）？")) {
+        if (-not (Confirm-Action "是否继续安装（会卸载现有实例后重新安装）？")) {
             Write-Info "已取消"
             exit 0
         }
+        # 必须先注销已有实例，wsl --install 不支持覆盖同名实例
+        Write-Info "正在注销现有实例: $instanceName ..."
+        wsl --unregister $instanceName | Out-Host
+        if ($LASTEXITCODE -ne 0) {
+            Write-Err "注销失败 (退出码: $LASTEXITCODE)"
+            exit 1
+        }
+        Write-Ok "已注销: $instanceName"
     }
 
     # 安装目录
