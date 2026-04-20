@@ -1224,6 +1224,8 @@ configure_zshrc() {
             sed -i '/^source.*oh-my-zsh\.sh/d' "$zshrc"
             sed -i "/^zstyle ':omz:plugins:eza'/d" "$zshrc"
             sed -i '/^# ── eza 插件配置/d' "$zshrc"
+            sed -i '/^fpath.*zsh-completions/d' "$zshrc"
+            sed -i '/^# ── zsh-completions fpath/d' "$zshrc"
         fi
 
         # 生成 plugins.toml 并下载插件
@@ -1328,15 +1330,29 @@ STARSHIP_INIT
     else
         # ── Oh My Zsh 模式 ──
 
+        # 动态构建 plugins 列表
+        # 基础插件：始终启用
+        local omz_plugins="git sudo command-not-found ssh-agent"
+        # zsh 生态插件
+        omz_plugins+=" eza fzf-tab zsh-autosuggestions fast-syntax-highlighting"
+        # 条件插件：仅在工具已安装时启用
+        if command_exists docker; then
+            omz_plugins+=" docker docker-compose"
+        fi
+        local plugins_line="plugins=(${omz_plugins})"
+        info "Oh My Zsh 插件列表: ${omz_plugins}"
+
         # 确保 oh-my-zsh 基础模板存在（从 Sheldon 切换过来时可能缺失）
         if [[ -f "$zshrc" ]] && ! grep -q "^source.*oh-my-zsh\.sh" "$zshrc"; then
             info "检测到 .zshrc 缺少 oh-my-zsh 模板，正在补充..."
-            # 在文件开头插入 oh-my-zsh 模板
             local omz_template
             omz_template=$(cat << 'OMZ_TPL'
 export ZSH="$HOME/.oh-my-zsh"
 ZSH_THEME=""
-plugins=(git eza fzf-tab zsh-completions zsh-autosuggestions fast-syntax-highlighting)
+__PLUGINS_PLACEHOLDER__
+
+# ── zsh-completions fpath（必须在 compinit / source oh-my-zsh.sh 之前）──
+fpath+=${ZSH_CUSTOM:-${ZSH:-~/.oh-my-zsh}/custom}/plugins/zsh-completions/src
 
 # ── eza 插件配置（需在 source oh-my-zsh.sh 之前）──
 zstyle ':omz:plugins:eza' 'dirs-first' yes
@@ -1345,6 +1361,8 @@ zstyle ':omz:plugins:eza' 'icons' yes
 source $ZSH/oh-my-zsh.sh
 OMZ_TPL
 )
+            # 将动态 plugins 列表替换占位符
+            omz_template="${omz_template/__PLUGINS_PLACEHOLDER__/$plugins_line}"
             # 将模板插入到文件开头
             printf '%s\n\n' "$omz_template" | cat - "$zshrc" > "${zshrc}.tmp" && mv "${zshrc}.tmp" "$zshrc"
         fi
@@ -1354,26 +1372,31 @@ OMZ_TPL
         fi
 
         # 更新 plugins 列表
-        local plugins_line='plugins=(git eza fzf-tab zsh-completions zsh-autosuggestions fast-syntax-highlighting)'
         if [[ -f "$zshrc" ]]; then
             update_omz_plugins_block "$zshrc" "$plugins_line"
         fi
 
-        # eza zstyle 配置必须在 source $ZSH/oh-my-zsh.sh 之前才能生效
-        # 先移除旧的 eza zstyle 行（如果有）
+        # 清理旧的 pre-source 配置（幂等性）
         if [[ -f "$zshrc" ]]; then
             sed -i "/^zstyle ':omz:plugins:eza'/d" "$zshrc"
+            sed -i '/^# ── eza 插件配置/d' "$zshrc"
+            sed -i '/^fpath.*zsh-completions/d' "$zshrc"
+            sed -i '/^# ── zsh-completions fpath/d' "$zshrc"
         fi
-        # 在 source $ZSH/oh-my-zsh.sh 之前插入 eza zstyle 配置
-        local eza_config
-        eza_config="$(cat <<'EOF'
+        # 在 source $ZSH/oh-my-zsh.sh 之前插入 pre-source 配置
+        # zsh-completions 的 fpath 必须在 compinit 之前（oh-my-zsh.sh 内部调用 compinit）
+        local pre_source_config
+        pre_source_config="$(cat <<'EOF'
+# ── zsh-completions fpath（必须在 compinit / source oh-my-zsh.sh 之前）──
+fpath+=${ZSH_CUSTOM:-${ZSH:-~/.oh-my-zsh}/custom}/plugins/zsh-completions/src
+
 # ── eza 插件配置（需在 source oh-my-zsh.sh 之前）──
 zstyle ':omz:plugins:eza' 'dirs-first' yes
 zstyle ':omz:plugins:eza' 'icons' yes
 EOF
 )"
         if [[ -f "$zshrc" ]]; then
-            insert_before_pattern "$zshrc" '^[[:space:]]*source[[:space:]]+.*oh-my-zsh\.sh' "$eza_config"
+            insert_before_pattern "$zshrc" '^[[:space:]]*source[[:space:]]+.*oh-my-zsh\.sh' "$pre_source_config"
         fi
 
         # 追加配置块（根据主题不同生成不同的配置）
