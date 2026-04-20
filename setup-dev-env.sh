@@ -1722,16 +1722,12 @@ uninstall_plugin_mgr() {
 }
 
 uninstall_zsh() {
-    header "卸载 Zsh"
-    if command_exists zsh; then
-        # 先切回 bash
-        if [[ "$SHELL" == *"zsh"* ]]; then
-            chsh -s "$(which bash)" 2>/dev/null || true
-        fi
-        sudo apt-get remove -y zsh 2>/dev/null || true
-        success "Zsh 已卸载"
+    header "恢复默认 Shell 为 Bash"
+    if [[ "$SHELL" == *"zsh"* ]]; then
+        chsh -s "$(which bash)" 2>/dev/null || true
+        success "默认 Shell 已切换回 Bash（下次登录生效）"
     else
-        info "Zsh 未安装，跳过"
+        info "当前默认 Shell 已是 Bash，跳过"
     fi
 }
 
