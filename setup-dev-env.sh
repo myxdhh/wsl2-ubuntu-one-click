@@ -110,9 +110,9 @@ COMPONENTS=(
     "theme:终端主题 (starship/p10k/pure)"
     "zsh-autosuggestions:zsh-autosuggestions 插件"
     "fast-syntax-highlighting:fast-syntax-highlighting 插件"
+    "fzf:fzf (模糊搜索)"
     "fzf-tab:fzf-tab (模糊补全)"
     "zsh-completions:zsh-completions (补全定义)"
-    "fzf:fzf (模糊搜索)"
     "zoxide:zoxide (智能 cd)"
     "rustup:Rust 工具链 (rustup)"
     "eza:eza (现代 ls 替代)"
@@ -127,6 +127,91 @@ COMPONENTS=(
 ZSH_CUSTOM_DIR="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
 
 command_exists() { command -v "$1" &>/dev/null; }
+
+# 统一重写 oh-my-zsh 的 plugins=(...) 配置。
+# 兼容：
+# - plugins=(git eza)
+# - plugins = ( git eza )
+# - 多行数组 / inline + 多行混合格式
+# 若未找到 plugins 块，则自动插入到 source oh-my-zsh.sh 之前。
+update_omz_plugins_block() {
+    local zshrc="$1"
+    local plugins_line="$2"
+
+    [[ -f "$zshrc" ]] || return 0
+
+    awk -v repl="$plugins_line" '
+        BEGIN { in_plugins=0; replaced=0; inserted=0 }
+
+        !replaced && !in_plugins && $0 ~ /^[[:space:]]*plugins[[:space:]]*=[[:space:]]*\(/ {
+            print repl
+            replaced=1
+            if ($0 ~ /\)/) {
+                next
+            }
+            in_plugins=1
+            next
+        }
+
+        in_plugins {
+            if ($0 ~ /\)/) {
+                in_plugins=0
+            }
+            next
+        }
+
+        !replaced && !inserted && $0 ~ /^[[:space:]]*source[[:space:]]+.*oh-my-zsh\.sh/ {
+            print repl
+            inserted=1
+        }
+
+        { print }
+
+        END {
+            if (!replaced && !inserted) {
+                print repl
+            }
+        }
+    ' "$zshrc" > "${zshrc}.tmp" && mv "${zshrc}.tmp" "$zshrc"
+}
+
+# 在匹配行之前插入多行文本（跨平台兼容 GNU/BSD）。
+# 使用 awk + ENVIRON 避免 sed 在 macOS 和 Linux 间的换行符处理差异：
+#   - GNU sed: i\ 后的 \n 被解析为换行
+#   - BSD sed: i\ 后的 \n 被当作字面文本
+# 用法: insert_before_pattern <file> <awk_regex_pattern> <multi_line_text>
+insert_before_pattern() {
+    local file="$1"
+    local pattern="$2"
+    local text="$3"
+
+    [[ -f "$file" ]] || return 0
+
+    _IBFP_TEXT="$text" _IBFP_PAT="$pattern" awk '
+        !done && $0 ~ ENVIRON["_IBFP_PAT"] { print ENVIRON["_IBFP_TEXT"]; done=1 }
+        { print }
+    ' "$file" > "${file}.tmp" && mv "${file}.tmp" "$file"
+}
+
+# 删除 oh-my-zsh 的 plugins=(...) 块（兼容单行和多行格式）。
+# Sheldon 模式清理时使用，避免 ohmyzsh 与 sheldon 双重加载。
+remove_omz_plugins_block() {
+    local file="$1"
+    [[ -f "$file" ]] || return 0
+
+    awk '
+        /^[[:space:]]*plugins[[:space:]]*=[[:space:]]*\(/ {
+            if (/\)/) { next }
+            in_plugins=1
+            next
+        }
+        in_plugins {
+            if (/\)/) { in_plugins=0 }
+            next
+        }
+        { print }
+    ' "$file" > "${file}.tmp" && mv "${file}.tmp" "$file"
+}
 
 # 生成 CLI 工具的 Zsh 补全文件
 generate_completions() {
@@ -386,7 +471,7 @@ install_apt_deps() {
     # 使用 --no-install-recommends 减少不必要的包
     local packages=(
         curl wget git build-essential unzip gzip xz-utils
-        ffmpeg p7zip-full jq poppler-utils fd-find ripgrep fzf zoxide imagemagick bat
+        ffmpeg p7zip-full jq poppler-utils fd-find ripgrep zoxide imagemagick bat
         make gcc
     )
 
@@ -1135,7 +1220,7 @@ configure_zshrc() {
         if [[ -f "$zshrc" ]]; then
             sed -i '/^export ZSH=.*\.oh-my-zsh/d' "$zshrc"
             sed -i '/^ZSH_THEME=/d' "$zshrc"
-            sed -i '/^plugins=(/d' "$zshrc"
+            remove_omz_plugins_block "$zshrc"
             sed -i '/^source.*oh-my-zsh\.sh/d' "$zshrc"
             sed -i "/^zstyle ':omz:plugins:eza'/d" "$zshrc"
             sed -i '/^# ── eza 插件配置/d' "$zshrc"
@@ -1270,8 +1355,8 @@ OMZ_TPL
 
         # 更新 plugins 列表
         local plugins_line='plugins=(git eza fzf-tab zsh-completions zsh-autosuggestions fast-syntax-highlighting)'
-        if [[ -f "$zshrc" ]] && grep -q "^plugins=" "$zshrc"; then
-            sed -i "s/^plugins=.*/${plugins_line}/" "$zshrc"
+        if [[ -f "$zshrc" ]]; then
+            update_omz_plugins_block "$zshrc" "$plugins_line"
         fi
 
         # eza zstyle 配置必须在 source $ZSH/oh-my-zsh.sh 之前才能生效
@@ -1280,9 +1365,15 @@ OMZ_TPL
             sed -i "/^zstyle ':omz:plugins:eza'/d" "$zshrc"
         fi
         # 在 source $ZSH/oh-my-zsh.sh 之前插入 eza zstyle 配置
-        local eza_config="# ── eza 插件配置（需在 source oh-my-zsh.sh 之前）──\nzstyle ':omz:plugins:eza' 'dirs-first' yes\nzstyle ':omz:plugins:eza' 'icons' yes"
-        if [[ -f "$zshrc" ]] && grep -q "^source.*oh-my-zsh.sh" "$zshrc"; then
-            sed -i "/^source.*oh-my-zsh.sh/i\\${eza_config}" "$zshrc"
+        local eza_config
+        eza_config="$(cat <<'EOF'
+# ── eza 插件配置（需在 source oh-my-zsh.sh 之前）──
+zstyle ':omz:plugins:eza' 'dirs-first' yes
+zstyle ':omz:plugins:eza' 'icons' yes
+EOF
+)"
+        if [[ -f "$zshrc" ]]; then
+            insert_before_pattern "$zshrc" '^[[:space:]]*source[[:space:]]+.*oh-my-zsh\.sh' "$eza_config"
         fi
 
         # 追加配置块（根据主题不同生成不同的配置）
@@ -1806,11 +1897,11 @@ run_install_all() {
     install_theme
     install_zsh_autosuggestions
     install_fast_syntax_highlighting
+    install_fzf        # fzf-tab 运行时硬依赖 fzf，必须先安装
     install_fzf_tab
     install_zsh_completions
 
     # 可选组件
-    should_install "fzf" && install_fzf
     should_install "zoxide" && install_zoxide
     should_install "rustup" && install_rustup
     should_install "eza" && install_eza
@@ -1848,11 +1939,11 @@ run_install_all() {
 
     echo "  • zsh-autosuggestions"
     echo "  • fast-syntax-highlighting"
+    echo "  • fzf (模糊搜索)"
     echo "  • fzf-tab"
     echo "  • zsh-completions"
 
     echo -e "\n${BOLD}可选组件配置结果：${NC}"
-    should_install "fzf" && echo "  • fzf (模糊搜索)"
     should_install "zoxide" && echo "  • zoxide (智能 cd)"
     should_install "rustup" && echo "  • Rust (rustup + cargo)"
     should_install "eza" && echo "  • eza"
@@ -1916,10 +2007,10 @@ run_uninstall_all() {
     uninstall_yazi
     uninstall_eza
     uninstall_zoxide
-    uninstall_fzf
     uninstall_fast_syntax_highlighting
-    uninstall_fzf_tab
     uninstall_zsh_completions
+    uninstall_fzf_tab
+    uninstall_fzf          # fzf-tab 之后卸载（安装的反序）
     uninstall_zsh_autosuggestions
     uninstall_theme
     uninstall_rustup
