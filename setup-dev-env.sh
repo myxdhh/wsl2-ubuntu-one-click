@@ -264,6 +264,38 @@ generate_completions() {
             fi
         fi
     fi
+    # docker（Docker ≥ 23.0 内置 zsh 补全生成）
+    if command_exists docker; then
+        docker completion zsh > "$comp_dir/_docker" 2>>"$LOG_FILE" && generated+=(docker)
+    fi
+    # gh (GitHub CLI)
+    if command_exists gh; then
+        gh completion -s zsh > "$comp_dir/_gh" 2>>"$LOG_FILE" && generated+=(gh)
+    fi
+    # pnpm
+    if command_exists pnpm; then
+        pnpm completion zsh > "$comp_dir/_pnpm" 2>>"$LOG_FILE" && generated+=(pnpm)
+    fi
+    # rg (ripgrep ≥ 14.0)
+    if command_exists rg; then
+        rg --generate complete-zsh > "$comp_dir/_rg" 2>>"$LOG_FILE" && generated+=(rg)
+    fi
+    # bun
+    if command_exists bun; then
+        bun completions > "$comp_dir/_bun" 2>>"$LOG_FILE" && generated+=(bun)
+    fi
+    # turbo (Turborepo)
+    if command_exists turbo; then
+        turbo completion zsh > "$comp_dir/_turbo" 2>>"$LOG_FILE" && generated+=(turbo)
+    fi
+    # just (命令运行器)
+    if command_exists just; then
+        just --completions zsh > "$comp_dir/_just" 2>>"$LOG_FILE" && generated+=(just)
+    fi
+    # yazi (ya = yazi-cli)
+    if command_exists ya; then
+        ya completion zsh > "$comp_dir/_ya" 2>>"$LOG_FILE" && generated+=(yazi)
+    fi
 
     # 验证：删除空文件（可能是命令静默失败）
     local f basename
@@ -471,7 +503,7 @@ install_apt_deps() {
     # 使用 --no-install-recommends 减少不必要的包
     local packages=(
         curl wget git build-essential unzip gzip xz-utils
-        ffmpeg p7zip-full jq poppler-utils fd-find ripgrep zoxide imagemagick bat
+        ffmpeg p7zip-full jq poppler-utils fd-find zoxide imagemagick bat
         make gcc
     )
 
@@ -494,6 +526,34 @@ install_apt_deps() {
             for pkg in "${missing_pkgs[@]}"; do
                 sudo apt-get install -y "$pkg" 2>&1 | tee -a "$LOG_FILE" || warn "包 $pkg 安装失败，跳过"
             done
+        fi
+    fi
+
+    # ripgrep: apt 版本过旧（Ubuntu 22.04 = 13.0，缺少 --generate 等新特性）
+    # 从 GitHub Releases 下载最新 .deb 包
+    if command_exists rg; then
+        success "ripgrep 已安装: $(rg --version | head -1)"
+    else
+        info "从 GitHub 安装最新版 ripgrep..."
+        local rg_ver
+        rg_ver=$(curl -fsSL https://api.github.com/repos/BurntSushi/ripgrep/releases/latest 2>>"$LOG_FILE" \
+            | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
+        if [[ -n "$rg_ver" ]]; then
+            local rg_deb
+            rg_deb=$(mktemp --suffix=.deb)
+            if curl -fsSL "https://github.com/BurntSushi/ripgrep/releases/download/${rg_ver}/ripgrep_${rg_ver}-1_amd64.deb" \
+                    -o "$rg_deb" 2>>"$LOG_FILE"; then
+                sudo dpkg -i "$rg_deb" 2>&1 | tee -a "$LOG_FILE"
+                rm -f "$rg_deb"
+                success "ripgrep ${rg_ver} 安装完成"
+            else
+                rm -f "$rg_deb"
+                warn "ripgrep 下载失败，尝试 apt 回退安装..."
+                sudo apt-get install -y ripgrep 2>&1 | tee -a "$LOG_FILE" || warn "ripgrep 安装失败"
+            fi
+        else
+            warn "无法获取 ripgrep 最新版本，尝试 apt 回退安装..."
+            sudo apt-get install -y ripgrep 2>&1 | tee -a "$LOG_FILE" || warn "ripgrep 安装失败"
         fi
     fi
 
@@ -1128,6 +1188,24 @@ use = ["{{ name }}.zsh"]
 github = "zdharma-continuum/fast-syntax-highlighting"
 
 PLUGINS_BLOCK
+
+    # sudo: ESC ESC 在命令前加/去 sudo
+    cat >> "$plugins_toml" << 'SUDO_PLUGIN'
+[plugins.ohmyzsh-sudo]
+github = "ohmyzsh/ohmyzsh"
+use = ["plugins/sudo/sudo.plugin.zsh"]
+apply = ["defer"]
+
+SUDO_PLUGIN
+
+    # ssh-agent: 自动启动 SSH agent
+    cat >> "$plugins_toml" << 'SSH_AGENT_PLUGIN'
+[plugins.ohmyzsh-ssh-agent]
+github = "ohmyzsh/ohmyzsh"
+use = ["plugins/ssh-agent/ssh-agent.plugin.zsh"]
+apply = ["defer"]
+
+SSH_AGENT_PLUGIN
 
     # eza inline aliases
     cat >> "$plugins_toml" << 'EZA_PLUGIN'

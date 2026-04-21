@@ -140,6 +140,76 @@ bash setup-dev-env.sh
 | uv                       | Python 版本管理               | uv             |
 | proto                    | 多语言版本管理                | proto          |
 
+## 目录结构与配置文件
+
+安装完成后，各工具的配置文件和数据分布如下：
+
+### Shell 配置
+
+| 路径 | 说明 |
+|---|---|
+| `~/.zshrc` | Zsh 主配置文件（脚本通过 `# >>> one-click-dev-env >>>` 标记块管理自动生成的部分） |
+| `~/.zshrc.bak.*` | `.zshrc` 自动备份（仅保留最近 3 个） |
+| `~/.zsh_history` | Zsh 命令历史 |
+
+### 插件管理器
+
+**Sheldon 模式：**
+
+| 路径 | 说明 |
+|---|---|
+| `~/.local/bin/sheldon` | Sheldon 二进制文件 |
+| `~/.config/sheldon/plugins.toml` | 插件配置（由脚本生成，定义所有插件及加载顺序） |
+| `~/.local/share/sheldon/` | Sheldon 下载的插件缓存 |
+
+**Oh My Zsh 模式：**
+
+| 路径 | 说明 |
+|---|---|
+| `~/.oh-my-zsh/` | Oh My Zsh 安装目录 |
+| `~/.oh-my-zsh/custom/plugins/` | 第三方插件（fzf-tab, zsh-autosuggestions 等） |
+| `~/.oh-my-zsh/completions/` | 自动生成的补全文件 |
+
+### 终端主题
+
+| 路径 | 说明 |
+|---|---|
+| `~/.local/bin/starship` | Starship 二进制文件 |
+| `~/.config/starship.toml` | Starship 主题配置（含 Catppuccin 配色） |
+| `~/powerlevel10k/` | Powerlevel10k 主题（git clone） |
+| `~/.p10k.zsh` | Powerlevel10k 用户配置 |
+| `~/.zsh/pure/` | Pure 主题（git clone） |
+
+### 补全文件
+
+| 路径 | 模式 | 说明 |
+|---|---|---|
+| `~/.zsh/completions/` | Sheldon | `generate_completions()` 生成的 `_rustup`、`_cargo`、`_docker` 等 |
+| `~/.oh-my-zsh/completions/` | Oh My Zsh | 同上，OMZ 模式下写入此处 |
+| `~/.oh-my-zsh/custom/plugins/zsh-completions/src/` | Oh My Zsh | zsh-completions 仓库的 300+ 补全定义 |
+
+> 当前自动生成补全的工具：`rustup`、`cargo`、`volta`、`uv`、`proto`、`starship`、`eza`、`docker`、`gh`、`pnpm`、`rg`、`bun`、`turbo`、`just`、`yazi`
+
+### 开发工具安装位置
+
+| 工具 | 安装路径 | 数据/配置路径 |
+|---|---|---|
+| fzf | `~/.fzf/` (git clone) | `~/.fzf.zsh` (shell 集成) |
+| zoxide | `~/.local/bin/zoxide` | `~/.local/share/zoxide/` (数据库) |
+| Rust (rustup) | `~/.rustup/` | `~/.cargo/` (cargo 工具链和缓存) |
+| eza | `~/.cargo/bin/eza` | — |
+| yazi | `~/.cargo/bin/yazi`, `~/.cargo/bin/ya` | `~/.config/yazi/` |
+| Volta | `~/.volta/` | `~/.volta/bin/` (node, npm, pnpm shims) |
+| uv | `~/.local/bin/uv` | `~/.local/share/uv/` |
+| proto | `~/.proto/` | `~/.proto/shims/`, `~/.proto/bin/` |
+| ripgrep | 系统路径 (dpkg 安装) | — |
+
+### 日志与调试
+
+| 路径 | 说明 |
+|---|---|
+| `~/.setup-dev-env.log` | 安装日志（所有组件的安装输出） |
+
 ## 安装后
 
 - **Starship 主题**：已自动配置 catppuccin-powerline 预设，配置文件位于 `~/.config/starship.toml`。支持 4 种 Catppuccin 风味（Mocha/Macchiato/Frappé/Latte），切换时会同步更新 fzf 配色
