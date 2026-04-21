@@ -93,7 +93,7 @@ fi
 # Catppuccin 风味: mocha (默认), macchiato, frappe, latte
 # 自动检测：如已有 starship.toml，读取当前 palette
 if [[ -f "$HOME/.config/starship.toml" ]] && grep -q 'palette.*catppuccin_' "$HOME/.config/starship.toml" 2>/dev/null; then
-    SELECTED_CATPPUCCIN_FLAVOR="$(grep 'palette' "$HOME/.config/starship.toml" | sed 's/.*catppuccin_//' | sed 's/".*//' | head -1)"
+    SELECTED_CATPPUCCIN_FLAVOR="$(grep 'palette' "$HOME/.config/starship.toml" | sed 's/.*catppuccin_//' | sed "s/[\"'].*//g" | head -1)"
 else
     SELECTED_CATPPUCCIN_FLAVOR="mocha"
 fi
