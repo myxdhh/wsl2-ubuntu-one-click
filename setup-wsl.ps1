@@ -440,10 +440,11 @@ function Step-InstallDistro {
 
     # 分发版列表（均已确认支持 --web-download）
     $distros = @(
-        @{ Number = 1; Name = "Ubuntu-24.04"; Label = "Ubuntu 24.04 LTS"; DefaultName = "Ubuntu2404" }
-        @{ Number = 2; Name = "Ubuntu-22.04"; Label = "Ubuntu 22.04 LTS"; DefaultName = "Ubuntu2204" }
-        @{ Number = 3; Name = "Ubuntu-20.04"; Label = "Ubuntu 20.04 LTS"; DefaultName = "Ubuntu2004" }
-        @{ Number = 4; Name = "Debian"; Label = "Debian"; DefaultName = "Debian" }
+        @{ Number = 1; Name = "Ubuntu-26.04"; Label = "Ubuntu 26.04 LTS"; DefaultName = "Ubuntu2604" }
+        @{ Number = 2; Name = "Ubuntu-24.04"; Label = "Ubuntu 24.04 LTS"; DefaultName = "Ubuntu2404" }
+        @{ Number = 3; Name = "Ubuntu-22.04"; Label = "Ubuntu 22.04 LTS"; DefaultName = "Ubuntu2204" }
+        @{ Number = 4; Name = "Ubuntu-20.04"; Label = "Ubuntu 20.04 LTS"; DefaultName = "Ubuntu2004" }
+        @{ Number = 5; Name = "Debian"; Label = "Debian"; DefaultName = "Debian" }
     )
 
     Write-Host "可用分发版（均支持 --web-download）：" -ForegroundColor Cyan
@@ -456,7 +457,7 @@ function Step-InstallDistro {
     $distroChoice = Read-DefaultInput -Prompt "请选择分发版编号" -Default "1"
     $distroIndex = [int]$distroChoice - 1
     if ($distroIndex -lt 0 -or $distroIndex -ge $distros.Count) {
-        Write-Warn "无效选择，使用默认 Ubuntu-24.04"
+        Write-Warn "无效选择，使用默认 Ubuntu-26.04"
         $distroIndex = 0
     }
     $selectedDistro = $distros[$distroIndex].Name
