@@ -18,7 +18,7 @@ docker desktop 基本上都安装过了，就不写到脚本了。
 - 插件管理 [Sheldon](https://github.com/rossmacarthur/sheldon)（默认）或 Oh My Zsh（可选）
 - 终端 zsh + [Starship](https://starship.rs/)（默认）/ powerlevel10k / pure + zsh-autosuggestions + fast-syntax-highlighting
 - 字体 MesloLGS NF
-- 工具 fzf, zoxide, Rust, Volta（包含 node、npm、pnpm 的 latest 版本）, uv（python 的 3.14 版本）, proto, eza, yazi
+- 工具 fzf, zoxide, mise（统一版本管理）, Rust, Node.js, npm, pnpm, uv, Python, eza, yazi
 
 ## 文件说明
 
@@ -76,7 +76,7 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/myxdhh/wsl2-ubuntu-one-c
 5. 选择插件管理器 (Sheldon 或 Oh My Zsh)
 6. 选择终端主题 (Starship / Powerlevel10k / Pure)
 7. 安装 MesloLGS Nerd Font 字体
-8. 选择要附加安装的开发工具 (fzf, zoxide, Rust, Volta, uv 等)
+8. 选择要附加安装的开发工具 (zoxide, eza, Rust, Node.js, uv 等)
 9. 在子系统内自动完成环境初始化
 
 ### 独立使用 Linux 脚本 (本地执行)
@@ -97,7 +97,7 @@ bash setup-dev-env.sh --install --theme starship --flavor latte
 bash setup-dev-env.sh --install --theme starship --flavor macchiato
 
 # 仅安装部分组件
-bash setup-dev-env.sh --install --components rustup volta uv
+bash setup-dev-env.sh --install --components rustup node uv python
 
 # 一键卸载所有组件
 bash setup-dev-env.sh --uninstall
@@ -106,7 +106,7 @@ bash setup-dev-env.sh --uninstall
 bash setup-dev-env.sh
 ```
 
-`--components` 可选值：`fzf`, `zoxide`, `rustup`, `eza`, `yazi`, `volta`, `uv`, `proto`
+`--components` 可选值：`zoxide`, `eza`, `yazi`, `rustup`, `node`, `uv`, `python`
 
 `--flavor` 可选值：
 
@@ -124,21 +124,22 @@ bash setup-dev-env.sh
 | Zsh                      | Shell 环境                    | apt-get        |
 | Sheldon（默认）            | 插件管理器                    | 预编译二进制   |
 | Oh My Zsh（可选）          | 插件管理器                    | install script |
-| Starship（默认）           | 终端主题 (Rust 编写、极速渲染) | 预编译二进制   |
+| mise                     | 多语言版本管理                | curl           |
+| Starship（默认）           | 终端主题 (Rust 编写、极速渲染) | mise           |
 | Powerlevel10k            | 终端主题 (功能丰富)          | sheldon / git  |
 | Pure                     | 终端主题 (极简、无需特殊字体) | sheldon / git  |
 | zsh-autosuggestions      | 命令补全建议                  | sheldon / git  |
-| fast-syntax-highlighting | 语法高亮 (极速、Chroma 引擎) | sheldon / git  |
+| fast-syntax-highlighting | 语法高亮 (Chroma 引擎)        | sheldon / git  |
 | fzf-tab                  | Tab 补全 fzf 界面             | sheldon / git  |
 | zsh-completions          | 300+ 命令补全定义          | sheldon / git  |
-| fzf                      | 模糊搜索                      | git clone      |
-| zoxide                   | 智能 cd (覆盖原生 cd)         | install script |
-| eza                      | 现代 `ls` 替代                | cargo          |
-| yazi                     | 终端文件管理器                | cargo          |
-| Rust (rustup)            | Rust 开发环境                 | rustup         |
-| Volta                    | Node/npm/pnpm 版本管理        | volta          |
-| uv                       | Python 版本管理               | uv             |
-| proto                    | 多语言版本管理                | proto          |
+| fzf                      | 模糊搜索                      | mise           |
+| zoxide                   | 智能 cd (覆盖原生 cd)         | mise           |
+| eza                      | 现代 `ls` 替代                | mise           |
+| yazi                     | 终端文件管理器                | mise           |
+| Rust (rustup)            | Rust 开发环境                 | mise           |
+| Node.js / npm / pnpm     | Node.js 开发环境              | mise           |
+| uv                       | Python 包管理                 | mise           |
+| Python                   | Python 运行时                  | mise           |
 
 ## 目录结构与配置文件
 
@@ -174,7 +175,7 @@ bash setup-dev-env.sh
 
 | 路径 | 说明 |
 |---|---|
-| `~/.local/bin/starship` | Starship 二进制文件 |
+| mise 管理                          | Starship 二进制文件 |
 | `~/.config/starship.toml` | Starship 主题配置（含 Catppuccin 配色） |
 | `~/powerlevel10k/` | Powerlevel10k 主题（git clone） |
 | `~/.p10k.zsh` | Powerlevel10k 用户配置 |
@@ -188,20 +189,21 @@ bash setup-dev-env.sh
 | `~/.oh-my-zsh/completions/` | Oh My Zsh | 同上，OMZ 模式下写入此处 |
 | `~/.oh-my-zsh/custom/plugins/zsh-completions/src/` | Oh My Zsh | zsh-completions 仓库的 300+ 补全定义 |
 
-> 当前自动生成补全的工具：`rustup`、`cargo`、`volta`、`uv`、`proto`、`starship`、`eza`、`docker`、`gh`、`pnpm`、`rg`、`bun`、`turbo`、`just`、`yazi`
+> 当前自动生成补全的工具：`rustup`、`cargo`、`uv`、`mise`、`starship`、`eza`、`docker`、`gh`、`pnpm`、`rg`、`bun`、`turbo`、`just`、`yazi`
 
 ### 开发工具安装位置
 
 | 工具 | 安装路径 | 数据/配置路径 |
 |---|---|---|
-| fzf | `~/.fzf/` (git clone) | `~/.fzf.zsh` (shell 集成) |
-| zoxide | `~/.local/bin/zoxide` | `~/.local/share/zoxide/` (数据库) |
-| Rust (rustup) | `~/.rustup/` | `~/.cargo/` (cargo 工具链和缓存) |
-| eza | `~/.cargo/bin/eza` | — |
-| yazi | `~/.cargo/bin/yazi`, `~/.cargo/bin/ya` | `~/.config/yazi/` |
-| Volta | `~/.volta/` | `~/.volta/bin/` (node, npm, pnpm shims) |
-| uv | `~/.local/bin/uv` | `~/.local/share/uv/` |
-| proto | `~/.proto/` | `~/.proto/shims/`, `~/.proto/bin/` |
+| mise | `~/.local/bin/mise` | `~/.local/share/mise/` (工具、shims), `~/.config/mise/` (配置) |
+| fzf | mise 管理 | — |
+| zoxide | mise 管理 | `~/.local/share/zoxide/` (数据库) |
+| Rust (rustup) | mise 管理 | `~/.cargo/` (cargo 工具链和缓存) |
+| eza | mise 管理 | — |
+| yazi | mise 管理 | `~/.config/yazi/` |
+| Node.js / npm / pnpm | mise 管理 | — |
+| uv | mise 管理 | `~/.local/share/uv/` |
+| Python | mise 管理 | — |
 | ripgrep | 系统路径 (dpkg 安装) | — |
 
 ### 日志与调试
@@ -229,7 +231,7 @@ p10k configure
   `brew tap homebrew/cask-fonts && brew install --cask font-meslo-lg-nerd-font`
 ## 添加命令补全
 
-脚本已自动为 `rustup`、`cargo`、`volta`、`uv`、`proto` 生成 Zsh 补全文件。如需为其他工具添加补全：
+脚本已自动为 `rustup`、`cargo`、`uv`、`mise` 生成 Zsh 补全文件。如需为其他工具添加补全：
 
 **Sheldon 模式**（补全文件目录：`~/.zsh/completions`）：
 
@@ -301,7 +303,7 @@ zstyle ':fzf-tab:complete:rustup:*' fzf-preview \
 - 启用 WSL2 功能后可能需要 **重启计算机**
 - 分发版使用 `--web-download` 模式下载，需要网络连接
 - **网络要求**：脚本在安装过程中不会自动配置任何国内镜像源（如 apt, npm, rustup 等），请确保您的网络环境能够顺畅访问外网（如 GitHub 等），否则可能导致下载极其缓慢或安装失败
-- eza 和 yazi 通过 cargo 编译安装，首次安装耗时较长
+- 所有开发工具（fzf, zoxide, eza, yazi, Rust, Node.js, uv, Python 等）均通过 mise 统一管理，安装预编译二进制，无需 cargo 编译
 - **TODO**: `Step-CreateUser` 中 `chpasswd` 的密码目前通过 `bash -c "echo '...' | chpasswd"` 传递，密码会短暂出现在进程参数列表中（`/proc/*/cmdline`）。尝试过 PowerShell stdin 管道方案，但因 WSL interop 层的编码/转义问题无法可靠工作，待后续改进
 
 ## 测试
@@ -328,7 +330,7 @@ bash setup-dev-env.sh --install --plugin-mgr sheldon --theme starship
 bash setup-dev-env.sh --install --plugin-mgr ohmyzsh --theme p10k
 
 # 仅安装部分组件
-bash setup-dev-env.sh --install --components volta uv
+bash setup-dev-env.sh --install --components node uv python
 
 # 交互模式
 bash setup-dev-env.sh

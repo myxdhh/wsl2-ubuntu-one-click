@@ -863,14 +863,13 @@ function Step-SelectComponents {
     Write-Header "步骤 6: 选择要安装的开发工具"
 
     $components = @(
-        @{ Id = "fzf"; Name = "fzf (模糊搜索)" }
         @{ Id = "zoxide"; Name = "zoxide (智能 cd)" }
-        @{ Id = "rustup"; Name = "Rust 工具链 (rustup)" }
         @{ Id = "eza"; Name = "eza (现代 ls 替代)" }
         @{ Id = "yazi"; Name = "yazi (终端文件管理器)" }
-        @{ Id = "volta"; Name = "Volta (Node.js/npm/pnpm 版本管理)" }
-        @{ Id = "uv"; Name = "uv (Python 环境管理)" }
-        @{ Id = "proto"; Name = "proto (多语言版本管理)" }
+        @{ Id = "rustup"; Name = "Rust 工具链 (rustup)" }
+        @{ Id = "node"; Name = "Node.js / npm / pnpm" }
+        @{ Id = "uv"; Name = "uv (Python 包管理)" }
+        @{ Id = "python"; Name = "Python" }
     )
 
     $themeDisplayName = switch ($Theme) {
@@ -881,9 +880,9 @@ function Step-SelectComponents {
     }
 
     if ($PluginMgr -eq "sheldon") {
-        Write-Host "  基础组件 (始终安装): Zsh, Sheldon, $themeDisplayName, zsh-autosuggestions, fast-syntax-highlighting" -ForegroundColor DarkGray
+        Write-Host "  基础组件 (始终安装): Zsh, Sheldon, mise, fzf, $themeDisplayName, zsh-autosuggestions, fast-syntax-highlighting" -ForegroundColor DarkGray
     } else {
-        Write-Host "  基础组件 (始终安装): Zsh, Oh My Zsh, $themeDisplayName, zsh-autosuggestions, fast-syntax-highlighting" -ForegroundColor DarkGray
+        Write-Host "  基础组件 (始终安装): Zsh, Oh My Zsh, mise, fzf, $themeDisplayName, zsh-autosuggestions, fast-syntax-highlighting" -ForegroundColor DarkGray
     }
     Write-Host ""
     Write-Host "  可选开发工具（↑↓ 移动，空格 切换，A 全选/全不选，回车 确认）：" -ForegroundColor Cyan

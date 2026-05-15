@@ -97,7 +97,7 @@ if [[ -f "$HOME/.config/starship.toml" ]] && grep -q 'palette.*catppuccin_' "$HO
 else
     SELECTED_CATPPUCCIN_FLAVOR="mocha"
 fi
-# 可选为空（全选），或逗号分隔的组件标识符 (如 "rustup,volta,uv")
+# 可选为空（全选），或逗号分隔的组件标识符 (如 "rustup,node,uv")
 SELECTED_COMPONENTS=""
 # 是否自动清理原脚本文件
 AUTO_CLEANUP=0
@@ -110,16 +110,17 @@ COMPONENTS=(
     "theme:终端主题 (starship/p10k/pure)"
     "zsh-autosuggestions:zsh-autosuggestions 插件"
     "fast-syntax-highlighting:fast-syntax-highlighting 插件"
+    "mise:mise (多语言版本管理)"
     "fzf:fzf (模糊搜索)"
     "fzf-tab:fzf-tab (模糊补全)"
     "zsh-completions:zsh-completions (补全定义)"
     "zoxide:zoxide (智能 cd)"
-    "rustup:Rust 工具链 (rustup)"
     "eza:eza (现代 ls 替代)"
     "yazi:yazi (终端文件管理器)"
-    "volta:Volta (Node/npm/pnpm 版本管理)"
-    "uv:uv (Python 版本管理)"
-    "proto:proto (多语言版本管理)"
+    "rustup:Rust 工具链 (rustup)"
+    "node:Node.js (含 npm/pnpm)"
+    "uv:uv (Python 包管理)"
+    "python:Python"
 )
 
 # ─── 工具函数 ─────────────────────────────────────────────────────────────────
@@ -230,17 +231,13 @@ generate_completions() {
         rustup completions zsh > "$comp_dir/_rustup" 2>>"$LOG_FILE" && generated+=(rustup)
         rustup completions zsh cargo > "$comp_dir/_cargo" 2>>"$LOG_FILE" && generated+=(cargo)
     fi
-    # volta（使用 -o 参数直接写入文件，比 stdout 重定向更可靠）
-    if command_exists volta; then
-        volta completions zsh -o "$comp_dir/_volta" 2>>"$LOG_FILE" && generated+=(volta)
-    fi
     # uv
     if command_exists uv; then
         uv generate-shell-completion zsh > "$comp_dir/_uv" 2>>"$LOG_FILE" && generated+=(uv)
     fi
-    # proto
-    if command_exists proto; then
-        proto completions --shell zsh > "$comp_dir/_proto" 2>>"$LOG_FILE" && generated+=(proto)
+    # mise
+    if command_exists mise; then
+        mise completion zsh > "$comp_dir/_mise" 2>>"$LOG_FILE" && generated+=(mise)
     fi
     # starship
     if command_exists starship; then
@@ -367,18 +364,12 @@ source_cargo_env() {
     [[ -f "$HOME/.cargo/env" ]] && source "$HOME/.cargo/env"
 }
 
-source_volta_env() {
-    export VOLTA_HOME="$HOME/.volta"
-    [[ -d "$VOLTA_HOME/bin" ]] && export PATH="$VOLTA_HOME/bin:$PATH"
-}
-
 source_uv_env() {
     [[ -d "$HOME/.local/bin" ]] && export PATH="$HOME/.local/bin:$PATH"
 }
 
-source_proto_env() {
-    export PROTO_HOME="$HOME/.proto"
-    export PATH="$PROTO_HOME/shims:$PROTO_HOME/bin:$PATH"
+source_mise_env() {
+    export PATH="$HOME/.local/share/mise/shims:$HOME/.local/bin:$PATH"
 }
 
 # ─── Catppuccin 风味辅助函数 ─────────────────────────────────────────────────
@@ -644,18 +635,47 @@ install_plugin_mgr() {
     fi
 }
 
+install_mise() {
+    header "安装 mise (多语言版本管理)"
+    log_start "mise"
+
+    if command_exists mise; then
+        success "mise 已安装: $(mise --version)"
+    else
+        if ! curl https://mise.run | sh 2>&1 | tee -a "$LOG_FILE"; then
+            record_failure "mise"
+            return 1
+        fi
+        export PATH="$HOME/.local/bin:$PATH"
+        success "mise 安装完成: $(mise --version)"
+    fi
+
+    # 信任全局配置（非交互式安装需要）
+    mise trust --all 2>>"$LOG_FILE" || true
+
+    log_end "mise" $?
+}
+
 install_rustup() {
-    header "安装 Rust 工具链 (rustup)"
+    header "安装 Rust 工具链 (rustup via mise)"
     log_start "rustup"
+    source_mise_env
+
+    if ! command_exists mise; then
+        error "mise 未找到，请先安装 mise"
+        record_failure "rustup"
+        return 1
+    fi
 
     if command_exists rustc; then
         success "Rust 已安装: $(rustc --version)"
     else
-        if ! curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y 2>&1 | tee -a "$LOG_FILE"; then
+        info "通过 mise 安装 Rust stable..."
+        if ! mise use -g rust@stable 2>&1 | tee -a "$LOG_FILE"; then
             record_failure "rustup"
             return 1
         fi
-        source_cargo_env
+        mise reshim 2>>"$LOG_FILE"
         success "Rust 安装完成: $(rustc --version)"
     fi
 
@@ -665,10 +685,10 @@ install_rustup() {
 install_eza() {
     header "安装 eza"
     log_start "eza"
-    source_cargo_env
+    source_mise_env
 
-    if ! command_exists cargo; then
-        error "cargo 未找到，请先安装 Rust"
+    if ! command_exists mise; then
+        error "mise 未找到，请先安装 mise"
         record_failure "eza"
         return 1
     fi
@@ -676,11 +696,12 @@ install_eza() {
     if command_exists eza; then
         success "eza 已安装: $(eza --version | head -1)"
     else
-        info "正在通过 cargo 编译安装 eza（可能需要几分钟）..."
-        if ! cargo install eza 2>&1 | tee -a "$LOG_FILE"; then
+        info "通过 mise 安装 eza..."
+        if ! mise use -g eza@latest 2>&1 | tee -a "$LOG_FILE"; then
             record_failure "eza"
             return 1
         fi
+        mise reshim 2>>"$LOG_FILE"
         success "eza 安装完成"
     fi
 
@@ -690,10 +711,10 @@ install_eza() {
 install_yazi() {
     header "安装 yazi"
     log_start "yazi"
-    source_cargo_env
+    source_mise_env
 
-    if ! command_exists cargo; then
-        error "cargo 未找到，请先安装 Rust"
+    if ! command_exists mise; then
+        error "mise 未找到，请先安装 mise"
         record_failure "yazi"
         return 1
     fi
@@ -701,11 +722,12 @@ install_yazi() {
     if command_exists yazi; then
         success "yazi 已安装"
     else
-        info "正在通过 cargo 编译安装 yazi（可能需要较长时间）..."
-        if ! cargo install --force yazi-build 2>&1 | tee -a "$LOG_FILE"; then
+        info "通过 mise 安装 yazi..."
+        if ! mise use -g yazi@latest 2>&1 | tee -a "$LOG_FILE"; then
             record_failure "yazi"
             return 1
         fi
+        mise reshim 2>>"$LOG_FILE"
         success "yazi 安装完成"
     fi
 
@@ -767,16 +789,26 @@ install_starship_theme() {
     log_start "starship-theme"
 
     # 安装 Starship 二进制
+    source_mise_env
     if command_exists starship; then
         success "Starship 已安装: $(starship --version 2>&1 | head -1)"
     else
-        info "正在安装 Starship..."
-        mkdir -p "$HOME/.local/bin"
-        if ! curl -sS https://starship.rs/install.sh | sh -s -- --yes --bin-dir "$HOME/.local/bin" 2>&1 | tee -a "$LOG_FILE"; then
-            record_failure "starship-theme"
-            return 1
+        if command_exists mise; then
+            info "通过 mise 安装 Starship..."
+            if ! mise use -g starship@latest 2>&1 | tee -a "$LOG_FILE"; then
+                record_failure "starship-theme"
+                return 1
+            fi
+            mise reshim 2>>"$LOG_FILE"
+        else
+            info "正在安装 Starship..."
+            mkdir -p "$HOME/.local/bin"
+            if ! curl -sS https://starship.rs/install.sh | sh -s -- --yes --bin-dir "$HOME/.local/bin" 2>&1 | tee -a "$LOG_FILE"; then
+                record_failure "starship-theme"
+                return 1
+            fi
+            export PATH="$HOME/.local/bin:$PATH"
         fi
-        export PATH="$HOME/.local/bin:$PATH"
         success "Starship 安装完成"
     fi
 
@@ -929,23 +961,23 @@ install_zsh_completions() {
 install_fzf() {
     header "安装 fzf (模糊搜索)"
     log_start "fzf"
+    source_mise_env
+
+    if ! command_exists mise; then
+        error "mise 未找到，请先安装 mise"
+        record_failure "fzf"
+        return 1
+    fi
 
     if command_exists fzf; then
         success "fzf 已安装: $(fzf --version 2>&1 | head -1)"
     else
-        if [[ -d "$HOME/.fzf" ]]; then
-            info "~/.fzf 目录已存在，尝试重新安装..."
-            rm -rf "$HOME/.fzf"
-        fi
-        if ! git clone --depth 1 https://github.com/junegunn/fzf.git "$HOME/.fzf" 2>&1 | tee -a "$LOG_FILE"; then
+        info "通过 mise 安装 fzf..."
+        if ! mise use -g fzf@latest 2>&1 | tee -a "$LOG_FILE"; then
             record_failure "fzf"
             return 1
         fi
-        # --key-bindings --completion: 启用快捷键和补全  --no-update-rc: 我们自己管理 .zshrc
-        if ! "$HOME/.fzf/install" --key-bindings --completion --no-update-rc --no-bash --no-fish 2>&1 | tee -a "$LOG_FILE"; then
-            record_failure "fzf"
-            return 1
-        fi
+        mise reshim 2>>"$LOG_FILE"
         success "fzf 安装完成"
     fi
 
@@ -955,53 +987,53 @@ install_fzf() {
 install_zoxide() {
     header "安装 zoxide (智能 cd)"
     log_start "zoxide"
+    source_mise_env
+
+    if ! command_exists mise; then
+        error "mise 未找到，请先安装 mise"
+        record_failure "zoxide"
+        return 1
+    fi
 
     if command_exists zoxide; then
         success "zoxide 已安装: $(zoxide --version 2>&1)"
     else
-        if ! curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh 2>&1 | tee -a "$LOG_FILE"; then
+        info "通过 mise 安装 zoxide..."
+        if ! mise use -g zoxide@latest 2>&1 | tee -a "$LOG_FILE"; then
             record_failure "zoxide"
             return 1
         fi
+        mise reshim 2>>"$LOG_FILE"
         success "zoxide 安装完成"
     fi
 
     log_end "zoxide" $?
 }
 
-install_volta() {
-    header "安装 Volta (Node/npm/pnpm)"
-    log_start "volta"
+install_node() {
+    header "安装 Node.js / npm / pnpm (via mise)"
+    log_start "node"
+    source_mise_env
 
-    if command_exists volta; then
-        success "Volta 已安装: $(volta --version)"
-    else
-        if ! curl https://get.volta.sh | bash -s -- --skip-setup 2>&1 | tee -a "$LOG_FILE"; then
-            record_failure "volta"
-            return 1
-        fi
-        source_volta_env
-        success "Volta 安装完成"
+    if ! command_exists mise; then
+        error "mise 未找到，请先安装 mise"
+        record_failure "node"
+        return 1
     fi
 
-    # 安装 node / npm / pnpm
-    source_volta_env
-    export VOLTA_FEATURE_PNPM=1
-
-    info "安装 Node.js (latest LTS)..."
-    if ! volta install node 2>&1 | tee -a "$LOG_FILE"; then
-        warn "Node.js 安装失败"
+    info "通过 mise 安装 Node.js LTS..."
+    if ! mise use -g node@lts 2>&1 | tee -a "$LOG_FILE"; then
+        record_failure "node"
+        return 1
     fi
 
     info "安装 npm (latest)..."
-    if ! volta install npm 2>&1 | tee -a "$LOG_FILE"; then
-        warn "npm 安装失败"
-    fi
+    mise use -g npm@latest 2>&1 | tee -a "$LOG_FILE" || warn "npm 安装失败"
 
     info "安装 pnpm (latest)..."
-    if ! volta install pnpm 2>&1 | tee -a "$LOG_FILE"; then
-        warn "pnpm 安装失败"
-    fi
+    mise use -g pnpm@latest 2>&1 | tee -a "$LOG_FILE" || warn "pnpm 安装失败"
+
+    mise reshim 2>>"$LOG_FILE"
 
     # 验证安装
     if command_exists node && command_exists npm && command_exists pnpm; then
@@ -1010,58 +1042,64 @@ install_volta() {
         warn "部分工具未正确安装，请手动检查"
     fi
 
-    log_end "volta" $?
+    log_end "node" $?
 }
 
 install_uv() {
-    header "安装 uv (Python 版本管理)"
+    header "安装 uv (Python 包管理 via mise)"
     log_start "uv"
+    source_mise_env
+
+    if ! command_exists mise; then
+        error "mise 未找到，请先安装 mise"
+        record_failure "uv"
+        return 1
+    fi
 
     if command_exists uv; then
         success "uv 已安装: $(uv --version)"
     else
-        if ! curl -LsSf https://astral.sh/uv/install.sh | sh 2>&1 | tee -a "$LOG_FILE"; then
+        info "通过 mise 安装 uv..."
+        if ! mise use -g uv@latest 2>&1 | tee -a "$LOG_FILE"; then
             record_failure "uv"
             return 1
         fi
-        source_uv_env
-        success "uv 安装完成"
-    fi
-
-    source_uv_env
-
-    info "安装 Python 3.14 并设为默认..."
-    if ! uv python install 3.14 --default 2>&1 | tee -a "$LOG_FILE"; then
-        warn "Python 3.14 安装失败，可能版本尚不可用"
-        info "尝试安装 Python 3.13..."
-        if uv python install 3.13 --default 2>&1 | tee -a "$LOG_FILE"; then
-            success "已回退安装 Python 3.13"
-        else
-            warn "Python 安装失败，请稍后手动安装"
-        fi
-    else
-        success "Python 3.14 已安装并设为默认"
+        mise reshim 2>>"$LOG_FILE"
+        success "uv 安装完成: $(uv --version)"
     fi
 
     log_end "uv" $?
 }
 
-install_proto() {
-    header "安装 proto (多语言版本管理)"
-    log_start "proto"
+install_python() {
+    header "安装 Python (via mise)"
+    log_start "python"
+    source_mise_env
 
-    if command_exists proto; then
-        success "proto 已安装: $(proto --version)"
-    else
-        if ! bash <(curl -fsSL https://moonrepo.dev/install/proto.sh) --yes 2>&1 | tee -a "$LOG_FILE"; then
-            record_failure "proto"
-            return 1
-        fi
-        source_proto_env
-        success "proto 安装完成"
+    if ! command_exists mise; then
+        error "mise 未找到，请先安装 mise"
+        record_failure "python"
+        return 1
     fi
 
-    log_end "proto" $?
+    info "通过 mise 安装 Python (latest)..."
+    if ! mise use -g python@latest 2>&1 | tee -a "$LOG_FILE"; then
+        record_failure "python"
+        return 1
+    fi
+
+    # 配置 uv 虚拟环境自动激活
+    mise settings set python.uv_venv_auto "create|source" 2>>"$LOG_FILE" || true
+
+    mise reshim 2>>"$LOG_FILE"
+
+    if command_exists python; then
+        success "Python 已安装: $(python --version)"
+    else
+        warn "Python 安装失败"
+    fi
+
+    log_end "python" $?
 }
 
 # ─── Sheldon plugins.toml 配置 ────────────────────────────────────────────────
@@ -1226,16 +1264,8 @@ EZA_PLUGIN
     cat >> "$plugins_toml" << 'FZF_PLUGIN'
 [plugins.fzf]
 inline = '''
-if [[ -f "$HOME/.fzf.zsh" ]]; then
-  source "$HOME/.fzf.zsh"
-elif (( $+commands[fzf] )); then
-  if [[ -n "$(fzf --zsh 2>/dev/null)" ]]; then
-    source <(fzf --zsh)
-  else
-    # apt 安装的 fzf (< 0.48)，加载发行版提供的快捷键和补全
-    [[ -f /usr/share/doc/fzf/examples/key-bindings.zsh ]] && source /usr/share/doc/fzf/examples/key-bindings.zsh
-    [[ -f /usr/share/doc/fzf/examples/completion.zsh ]] && source /usr/share/doc/fzf/examples/completion.zsh
-  fi
+if (( $+commands[fzf] )); then
+  source <(fzf --zsh 2>/dev/null) || true
 fi
 '''
 
@@ -1333,17 +1363,11 @@ P10K_INSTANT
 # zsh 登录 shell 不会 source ~/.profile，需要在此显式设置
 [[ -d "$HOME/.local/bin" ]] && export PATH="$HOME/.local/bin:$PATH"
 
-# ── Volta ──
-export VOLTA_HOME="$HOME/.volta"
-export VOLTA_FEATURE_PNPM=1
-[[ -d "$VOLTA_HOME/bin" ]] && export PATH="$VOLTA_HOME/bin:$PATH"
-
 # ── Cargo / Rust ──
 [[ -f "$HOME/.cargo/env" ]] && source "$HOME/.cargo/env"
 
-# ── proto ──
-export PROTO_HOME="$HOME/.proto"
-export PATH="$PROTO_HOME/shims:$PROTO_HOME/bin:$PATH"
+# ── mise (多语言版本管理) ──
+eval "$(mise activate zsh --shims)"
 
 # ── Zsh History ──
 HISTFILE="$HOME/.zsh_history"
@@ -1488,17 +1512,11 @@ EOF
 # zsh 登录 shell 不会 source ~/.profile，需要在此显式设置
 [[ -d "$HOME/.local/bin" ]] && export PATH="$HOME/.local/bin:$PATH"
 
-# ── Volta ──
-export VOLTA_HOME="$HOME/.volta"
-export VOLTA_FEATURE_PNPM=1
-[[ -d "$VOLTA_HOME/bin" ]] && export PATH="$VOLTA_HOME/bin:$PATH"
-
 # ── Cargo / Rust ──
 [[ -f "$HOME/.cargo/env" ]] && source "$HOME/.cargo/env"
 
-# ── proto ──
-export PROTO_HOME="$HOME/.proto"
-export PATH="$PROTO_HOME/shims:$PROTO_HOME/bin:$PATH"
+# ── mise (多语言版本管理) ──
+eval "$(mise activate zsh --shims)"
 
 # ── Zsh History ──
 HISTFILE="$HOME/.zsh_history"
@@ -1536,15 +1554,8 @@ FZF_OPTS
             cat << 'ENV_BLOCK2'
 
 # ── fzf ──
-if [[ -f "$HOME/.fzf.zsh" ]]; then
-  source "$HOME/.fzf.zsh"
-elif (( $+commands[fzf] )); then
-  if [[ -n "$(fzf --zsh 2>/dev/null)" ]]; then
-    source <(fzf --zsh)
-  else
-    [[ -f /usr/share/doc/fzf/examples/key-bindings.zsh ]] && source /usr/share/doc/fzf/examples/key-bindings.zsh
-    [[ -f /usr/share/doc/fzf/examples/completion.zsh ]] && source /usr/share/doc/fzf/examples/completion.zsh
-  fi
+if (( $+commands[fzf] )); then
+  source <(fzf --zsh 2>/dev/null) || true
 fi
 
 # ── zoxide ──
@@ -1634,6 +1645,33 @@ P10K_BLOCK
 
 # ─── 卸载函数 ─────────────────────────────────────────────────────────────────
 
+uninstall_mise() {
+    header "卸载 mise"
+    if command_exists mise; then
+        mise implode --yes 2>/dev/null || true
+        rm -f "$HOME/.local/bin/mise"
+        rm -rf "$HOME/.local/share/mise" "$HOME/.config/mise" "$HOME/.cache/mise"
+        success "mise 已卸载"
+    else
+        info "mise 未安装，跳过"
+    fi
+}
+
+uninstall_node() {
+    header "卸载 Node.js / npm / pnpm"
+    info "Node.js / npm / pnpm 由 mise 管理，将在卸载 mise 时一并清理"
+}
+
+uninstall_pnpm() {
+    header "卸载 pnpm"
+    info "pnpm 由 mise 管理，将在卸载 mise 时一并清理"
+}
+
+uninstall_python() {
+    header "卸载 Python"
+    info "Python 由 mise 管理，将在卸载 mise 时一并清理"
+}
+
 uninstall_proto() {
     header "卸载 proto"
     if [[ -d "$HOME/.proto" ]]; then
@@ -1646,38 +1684,35 @@ uninstall_proto() {
 
 uninstall_fzf() {
     header "卸载 fzf"
+    info "fzf 由 mise 管理，将在卸载 mise 时一并清理"
+    # 兼容清理旧的 git clone 安装
     if [[ -d "$HOME/.fzf" ]]; then
         rm -rf "$HOME/.fzf"
         rm -f "$HOME/.fzf.zsh" "$HOME/.fzf.bash"
-        success "fzf 已卸载"
-    elif command_exists fzf; then
-        rm -f "$(which fzf)" 2>/dev/null || true
-        success "fzf 已卸载"
-    else
-        info "fzf 未安装，跳过"
+        success "已清理旧版 fzf (编译安装)"
     fi
 }
 
 uninstall_zoxide() {
     header "卸载 zoxide"
-    if command_exists zoxide || [[ -f "$HOME/.local/bin/zoxide" ]]; then
+    info "zoxide 由 mise 管理，将在卸载 mise 时一并清理"
+    # 兼容清理旧的独立安装
+    if [[ -f "$HOME/.local/bin/zoxide" ]]; then
         rm -f "$HOME/.local/bin/zoxide"
-        rm -rf "$HOME/.local/share/zoxide"
-        success "zoxide 已卸载"
-    else
-        info "zoxide 未安装，跳过"
+        success "已清理旧版 zoxide"
     fi
+    rm -rf "$HOME/.local/share/zoxide" 2>/dev/null || true
 }
 
 uninstall_uv() {
     header "卸载 uv"
-    source_uv_env
-    if command_exists uv; then
+    info "uv 由 mise 管理，将在卸载 mise 时一并清理"
+    # 兼容清理旧的独立安装
+    if [[ -f "$HOME/.local/bin/uv" ]]; then
+        source_uv_env
         uv self uninstall --yes 2>/dev/null || true
         rm -rf "$HOME/.local/bin/uv" "$HOME/.local/bin/uvx" "$HOME/.local/share/uv"
-        success "uv 已卸载"
-    else
-        info "uv 未安装，跳过"
+        success "已清理旧版 uv (独立安装)"
     fi
 }
 
@@ -1764,34 +1799,32 @@ uninstall_zsh_completions() {
 
 uninstall_yazi() {
     header "卸载 yazi"
+    info "yazi 由 mise 管理，将在卸载 mise 时一并清理"
+    # 兼容清理旧的 cargo 安装
     source_cargo_env
-    if command_exists yazi; then
+    if command_exists cargo; then
         cargo uninstall yazi-fm yazi-cli yazi-build 2>/dev/null || true
-        success "yazi 已卸载"
-    else
-        info "yazi 未安装，跳过"
     fi
 }
 
 uninstall_eza() {
     header "卸载 eza"
+    info "eza 由 mise 管理，将在卸载 mise 时一并清理"
+    # 兼容清理旧的 cargo 安装
     source_cargo_env
-    if command_exists eza; then
+    if command_exists cargo; then
         cargo uninstall eza 2>/dev/null || true
-        success "eza 已卸载"
-    else
-        info "eza 未安装，跳过"
     fi
 }
 
 uninstall_rustup() {
     header "卸载 Rust (rustup)"
+    info "Rust 由 mise 管理，将在卸载 mise 时一并清理"
+    # 兼容清理旧的独立安装
     source_cargo_env
-    if command_exists rustup; then
-        rustup self uninstall -y
-        success "Rust 已卸载"
-    else
-        info "Rust 未安装，跳过"
+    if [[ -f "$HOME/.cargo/env" ]] && command_exists rustup; then
+        rustup self uninstall -y 2>/dev/null || true
+        success "已清理旧版 Rust (独立安装)"
     fi
 }
 
@@ -1857,13 +1890,13 @@ remove_zshrc_config() {
 
 uninstall_starship_theme() {
     header "卸载 Starship"
-    if command_exists starship || [[ -f "$HOME/.local/bin/starship" ]]; then
+    info "Starship 由 mise 管理，将在卸载 mise 时一并清理"
+    # 兼容清理旧的独立安装
+    if [[ -f "$HOME/.local/bin/starship" ]]; then
         rm -f "$HOME/.local/bin/starship"
-        rm -f "$HOME/.config/starship.toml"
-        success "Starship 已卸载"
-    else
-        info "Starship 未安装，跳过"
+        success "已清理旧版 Starship (独立安装)"
     fi
+    rm -f "$HOME/.config/starship.toml"
 }
 
 # ─── 耗时估算 ─────────────────────────────────────────────────────────────────
@@ -1875,11 +1908,11 @@ estimate_time() {
     else
         echo "  • 基础依赖 + zsh + Oh My Zsh:  ~2 分钟"
     fi
-    echo "  • Rust + eza + yazi (cargo 编译): ~10-20 分钟"
-    echo "  • Volta + Node/npm/pnpm:  ~2 分钟"
+    echo "  • mise + 开发工具 (预编译二进制):  ~3 分钟"
+    echo "  • Node/npm/pnpm:  ~1 分钟"
     echo "  • uv + Python:  ~2 分钟"
     echo "  • 其他:  ~1 分钟"
-    echo -e "  ${BOLD}总计约 20-30 分钟${NC}（取决于网络和机器性能）"
+    echo -e "  ${BOLD}总计约 5-10 分钟${NC}（取决于网络和机器性能）"
     echo ""
 }
 
@@ -1969,14 +2002,16 @@ run_install_all() {
     local start_time
     start_time=$(date +%s)
 
-    # 自动处理依赖关系：如果选择了 eza 或 yazi，则必须安装 rustup
+    # 自动处理依赖关系：需要 mise 的组件自动添加 mise 依赖
     if [[ -n "$SELECTED_COMPONENTS" ]]; then
         local comps=",${SELECTED_COMPONENTS},"
-        if [[ "$comps" == *",eza,"* || "$comps" == *",yazi,"* ]]; then
-            if [[ "$comps" != *",rustup,"* ]]; then
-                SELECTED_COMPONENTS="${SELECTED_COMPONENTS},rustup"
-                info "因选择了 eza 或 yazi，自动添加 rustup 依赖"
-            fi
+        local need_mise=0
+        for dep in zoxide eza yazi rustup node uv python; do
+            [[ "$comps" == *",${dep},"* ]] && need_mise=1
+        done
+        if [[ $need_mise -eq 1 && "$comps" != *",mise,"* ]]; then
+            SELECTED_COMPONENTS="mise,${SELECTED_COMPONENTS}"
+            info "自动添加 mise 依赖"
         fi
     fi
 
@@ -1991,21 +2026,22 @@ run_install_all() {
     install_apt_deps
     install_zsh
     install_plugin_mgr
+    install_mise       # mise 必须在 fzf/theme 之前，因为 fzf 和 starship 都通过 mise 安装
+    install_fzf        # fzf-tab 运行时硬依赖 fzf，必须先安装
     install_theme
     install_zsh_autosuggestions
     install_fast_syntax_highlighting
-    install_fzf        # fzf-tab 运行时硬依赖 fzf，必须先安装
     install_fzf_tab
     install_zsh_completions
 
     # 可选组件
     should_install "zoxide" && install_zoxide
-    should_install "rustup" && install_rustup
     should_install "eza" && install_eza
     should_install "yazi" && install_yazi
-    should_install "volta" && install_volta
+    should_install "rustup" && install_rustup
+    should_install "node" && install_node
     should_install "uv" && install_uv
-    should_install "proto" && install_proto
+    should_install "python" && install_python
     
     # 生成 CLI 工具的补全文件（必须在 configure_zshrc 之前）
     generate_completions
@@ -2034,6 +2070,7 @@ run_install_all() {
         *)        echo "  • Powerlevel10k 主题" ;;
     esac
 
+    echo "  • mise (多语言版本管理)"
     echo "  • zsh-autosuggestions"
     echo "  • fast-syntax-highlighting"
     echo "  • fzf (模糊搜索)"
@@ -2042,12 +2079,12 @@ run_install_all() {
 
     echo -e "\n${BOLD}可选组件配置结果：${NC}"
     should_install "zoxide" && echo "  • zoxide (智能 cd)"
-    should_install "rustup" && echo "  • Rust (rustup + cargo)"
     should_install "eza" && echo "  • eza"
     should_install "yazi" && echo "  • yazi"
-    should_install "volta" && echo "  • Volta (Node.js + npm + pnpm)"
-    should_install "uv" && echo "  • uv (Python)"
-    should_install "proto" && echo "  • proto"
+    should_install "rustup" && echo "  • Rust (rustup + cargo)"
+    should_install "node" && echo "  • Node.js / npm / pnpm"
+    should_install "uv" && echo "  • uv (Python 包管理)"
+    should_install "python" && echo "  • Python"
 
     print_summary
 
@@ -2098,19 +2135,23 @@ run_uninstall_all() {
     echo ""
 
     remove_zshrc_config
-    uninstall_proto
+    uninstall_python
     uninstall_uv
-    uninstall_volta
+    uninstall_node
     uninstall_yazi
     uninstall_eza
     uninstall_zoxide
     uninstall_fast_syntax_highlighting
     uninstall_zsh_completions
     uninstall_fzf_tab
-    uninstall_fzf          # fzf-tab 之后卸载（安装的反序）
+    uninstall_fzf
     uninstall_zsh_autosuggestions
     uninstall_theme
     uninstall_rustup
+    uninstall_mise
+    # 兼容清理旧工具
+    uninstall_volta
+    uninstall_proto
     uninstall_plugin_mgr
     uninstall_zsh
     uninstall_apt_deps
@@ -2178,9 +2219,18 @@ show_status_indicator() {
             ;;
         fzf)          command_exists fzf && echo -e "${GREEN}●${NC}" || echo -e "${RED}○${NC}" ;;
         zoxide)       command_exists zoxide && echo -e "${GREEN}●${NC}" || echo -e "${RED}○${NC}" ;;
-        volta)        command_exists volta && echo -e "${GREEN}●${NC}" || echo -e "${RED}○${NC}" ;;
+        mise)         command_exists mise && echo -e "${GREEN}●${NC}" || echo -e "${RED}○${NC}" ;;
+        node)
+            if command_exists node && command_exists npm && command_exists pnpm; then
+                echo -e "${GREEN}●${NC}"
+            elif command_exists node; then
+                echo -e "${YELLOW}●${NC}"
+            else
+                echo -e "${RED}○${NC}"
+            fi
+            ;;
         uv)           command_exists uv && echo -e "${GREEN}●${NC}" || echo -e "${RED}○${NC}" ;;
-        proto)        command_exists proto && echo -e "${GREEN}●${NC}" || echo -e "${RED}○${NC}" ;;
+        python)       command_exists python && echo -e "${GREEN}●${NC}" || echo -e "${RED}○${NC}" ;;
         *)            echo -e "${RED}○${NC}" ;;
     esac
 }
@@ -2468,7 +2518,7 @@ main() {
                 ;;
             --components)
                 shift
-                # 支持空格分隔和逗号分隔: --components rustup eza volta 或 --components rustup,eza,volta
+                # 支持空格分隔和逗号分隔: --components rustup eza node 或 --components rustup,eza,node
                 local _comps=""
                 while [[ $# -gt 0 && ! "$1" =~ ^-- ]]; do
                     if [[ -n "$_comps" ]]; then
@@ -2503,8 +2553,8 @@ main() {
                 echo "    pure     Pure          极简美观、无需特殊字体"
                 echo "  --components comp1 [comp2 ...]"
                 echo "                         指定要安装的可选组件，不传则安装全部"
-                echo "                         例: --components rustup eza volta"
-                echo "                         可选值: fzf, zoxide, rustup, eza, yazi, volta, uv, proto"
+                echo "                         例: --components rustup node eza"
+                echo "                         可选值: zoxide, eza, yazi, rustup, node, uv, python"
                 echo "  --help, -h             显示帮助信息"
                 echo "  （无参数）              进入交互界面"
                 echo ""
